@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, Upload } from 'lucide-react';
 import TerminalHeader from '@/components/TerminalHeader';
 import { NavLink } from '@/components/NavLink';
 
@@ -112,6 +112,39 @@ const Admin = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleUploadVerificationKey = async () => {
+    try {
+      // Fetch the verification key from public folder
+      const response = await fetch('/zkp/verification_key.json');
+      const vkey = await response.json();
+      
+      // Convert to blob
+      const blob = new Blob([JSON.stringify(vkey)], { type: 'application/json' });
+      
+      // Upload to Supabase storage
+      const { error } = await supabase.storage
+        .from('zkp')
+        .upload('verification_key.json', blob, {
+          upsert: true,
+          contentType: 'application/json'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Verification key uploaded to storage",
+      });
+    } catch (error: any) {
+      console.error('Error uploading verification key:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to upload verification key",
+        variant: "destructive",
+      });
     }
   };
 
@@ -219,6 +252,24 @@ const Admin = () => {
                 ) : (
                   'Save Changes'
                 )}
+              </Button>
+            </Card>
+
+            <Card className="p-6 space-y-4">
+              <div>
+                <h2 className="text-xl font-semibold mb-2">ZK Proof Setup</h2>
+                <p className="text-sm text-muted-foreground">
+                  Upload the verification key to storage for backend edge function verification
+                </p>
+              </div>
+              
+              <Button
+                onClick={handleUploadVerificationKey}
+                variant="secondary"
+                className="gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                Upload Verification Key to Storage
               </Button>
             </Card>
           </div>
