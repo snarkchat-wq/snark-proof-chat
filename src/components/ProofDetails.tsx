@@ -2,7 +2,7 @@ import { Check, X, Clock, Shield, Hash, Key } from "lucide-react";
 
 interface ProofDetailsProps {
   proofData: {
-    proof: string;
+    proof: any;
     publicInputs: any;
   };
   verified: boolean;
@@ -66,8 +66,31 @@ const ProofDetails = ({
           <Hash className="w-3 h-3" />
           <span className="font-bold">Proof Signature</span>
         </div>
-        <div className="bg-card p-2 break-all text-foreground">
-          {proofData.proof}
+        <div className="bg-card p-2 text-foreground">
+          {typeof proofData.proof === 'object' && proofData.proof !== null ? (
+            <div className="space-y-1">
+              <div className="text-xs">
+                <span className="text-muted-foreground">Type:</span> {(proofData.proof as any)?.protocol || 'groth16'} 
+                {(proofData.proof as any)?.curve ? ` (${(proofData.proof as any).curve})` : ''}
+              </div>
+              <div className="text-[10px] text-muted-foreground break-all">
+                pi_a: [{(proofData.proof as any)?.pi_a?.slice(0, 2).join(', ')}...]
+              </div>
+              <div className="text-[10px] text-muted-foreground break-all">
+                pi_c: [{(proofData.proof as any)?.pi_c?.slice(0, 2).join(', ')}...]
+              </div>
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(proofData.proof, null, 2));
+                }}
+                className="text-accent hover:underline text-[10px] mt-1"
+              >
+                [Copy Full Proof]
+              </button>
+            </div>
+          ) : (
+            <div className="break-all">{String(proofData.proof || 'N/A')}</div>
+          )}
         </div>
       </div>
 
