@@ -1,4 +1,4 @@
-import { getTokenRequirements, getSPLTokenBalance } from './tokenGating';
+import { getTokenRequirements } from './tokenGating';
 
 // SnarkJS will be loaded dynamically
 let snarkjs: any = null;
@@ -35,22 +35,42 @@ export async function generateTokenBalanceProof(
     // Load SnarkJS library
     const snarkjs = await loadSnarkJS();
     
-    // Get token requirements
+    // Get token requirements from database
     const requirements = await getTokenRequirements();
     if (!requirements) {
       throw new Error('Token requirements not configured');
     }
     
-    // Get actual token balance
-    const actualBalance = await getSPLTokenBalance(
-      walletAddress,
-      requirements.token_mint_address
+    console.log('🌐 Fetching balance via backend to avoid CORS/rate-limits...');
+    
+    // Use backend edge function to get balance (avoids browser CORS/rate-limit issues)
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: balanceData, error: balanceError } = await supabase.functions.invoke(
+      'verify-token-balance',
+      {
+        body: {
+          walletAddress,
+          tokenMintAddress: requirements.token_mint_address,
+        },
+      }
     );
+
+    if (balanceError) {
+      console.error('❌ Backend balance check failed:', balanceError);
+      throw new Error(`Failed to fetch balance: ${balanceError.message}`);
+    }
+
+    if (!balanceData) {
+      throw new Error('No balance data returned from backend');
+    }
+
+    const actualBalance = Number(balanceData.balance ?? 0);
+    const requiredThreshold = Number(balanceData.required ?? requirements.threshold_amount);
     
-    console.log(`Balance: ${actualBalance}, Required: ${requirements.threshold_amount}`);
+    console.log(`Balance: ${actualBalance}, Required: ${requiredThreshold}`);
     
-    if (actualBalance < requirements.threshold_amount) {
-      throw new Error(`Insufficient balance: ${actualBalance} < ${requirements.threshold_amount}`);
+    if (actualBalance < requiredThreshold) {
+      throw new Error(`Insufficient balance: ${actualBalance} < ${requiredThreshold}`);
     }
     
     // Generate random salt for commitment
@@ -72,7 +92,7 @@ export async function generateTokenBalanceProof(
     const input = {
       actualBalance: balanceInt.toString(),
       salt: salt.toString(),
-      threshold: requirements.threshold_amount.toString(),
+      threshold: requiredThreshold.toString(),
       commitment: commitment.toString(),
     };
     
