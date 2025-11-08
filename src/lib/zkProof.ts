@@ -84,24 +84,23 @@ export async function generateTokenBalanceProof(
     // Calculate commitment: Poseidon(balance, salt)
     // Note: This would normally use the Poseidon hash from circomlibjs
     // For now, we'll compute it using the circuit itself
-    // Load Poseidon hash from circomlibjs with robust fallback
+    // Load Poseidon hash from circomlibjs (browser-safe)
     // @ts-ignore - Dynamic import
     const circomlib = await import('circomlibjs');
-    let poseidon: any = (circomlib as any).poseidon || (circomlib as any).default?.poseidon;
-    if (!poseidon && (circomlib as any).buildPoseidon) {
-      poseidon = await (circomlib as any).buildPoseidon();
+    const buildPoseidon = (circomlib as any).buildPoseidon || (circomlib as any).default?.buildPoseidon;
+    if (!buildPoseidon) {
+      throw new Error('circomlibjs.buildPoseidon not available');
     }
-    if (typeof poseidon !== 'function') {
-      throw new Error('Poseidon hash not available (circomlibjs export mismatch)');
-    }
-    const commitment = poseidon([BigInt(balanceInt), salt]);
+    const poseidon = await buildPoseidon();
+    const commitmentEl = poseidon([BigInt(balanceInt), salt]);
+    const commitment = poseidon.F.toString(commitmentEl);
     
     // Prepare circuit inputs
     const input = {
       actualBalance: balanceInt.toString(),
       salt: salt.toString(),
       threshold: requiredThreshold.toString(),
-      commitment: commitment.toString(),
+      commitment: commitment,
     };
     
     console.log('📝 Prepared circuit inputs (private data hidden)');
