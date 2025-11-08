@@ -61,7 +61,7 @@ const Chat = () => {
       
       toast({
         title: "Message Sent ✅",
-        description: "Your message has been encrypted, verified, and logged to Solana",
+        description: "Your message has been encrypted, verified, and logged to Solana Mainnet",
       });
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -145,7 +145,7 @@ const Chat = () => {
                     <div className="text-accent">
                       ⛓️ Blockchain: 
                       <a 
-                        href={`https://explorer.solana.com/tx/${msg.blockchain_tx_hash}?cluster=devnet`}
+                        href={`https://explorer.solana.com/tx/${msg.blockchain_tx_hash}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:underline ml-1"
@@ -210,7 +210,7 @@ const Chat = () => {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2 font-mono">
-            <span className="text-accent">&gt;</span> Press Enter to send • Messages are encrypted and verified with ZK proofs
+            <span className="text-accent">&gt;</span> Press Enter to send • Messages are encrypted and verified with ZK proofs • Logged to Solana Mainnet
           </p>
         </div>
       </div>

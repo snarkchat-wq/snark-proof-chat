@@ -54,7 +54,7 @@ const About = () => {
               <div className="border-l-2 border-accent pl-4">
                 <h3 className="text-accent font-bold mb-2">4. BLOCKCHAIN VERIFICATION</h3>
                 <p className="text-foreground">
-                  Proof is verified and optionally logged to Solana blockchain via JSON-RPC for transparency.
+                  Proof is verified and logged to Solana Mainnet blockchain via JSON-RPC for transparency.
                 </p>
               </div>
             </div>
@@ -112,7 +112,7 @@ Blockchain logs only hash ──────────────────
                 <ul className="space-y-1 text-foreground">
                   <li>• Phantom Wallet SDK</li>
                   <li>• Solana JSON-RPC</li>
-                  <li>• Devnet/Mainnet</li>
+                  <li>• Mainnet (Live Transactions)</li>
                 </ul>
               </div>
 

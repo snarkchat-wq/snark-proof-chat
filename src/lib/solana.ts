@@ -1,7 +1,7 @@
 import { Connection, Transaction, TransactionInstruction, PublicKey } from '@solana/web3.js';
 
-// Solana Devnet RPC endpoint
-const SOLANA_RPC = 'https://api.devnet.solana.com';
+// Solana Mainnet RPC endpoint
+const SOLANA_RPC = 'https://api.mainnet-beta.solana.com';
 const connection = new Connection(SOLANA_RPC, 'confirmed');
 
 // Memo program ID (standard Solana memo program)
@@ -70,7 +70,7 @@ export async function signAndSendTransaction(
   }
 }
 
-export function getExplorerUrl(signature: string, network: 'devnet' | 'mainnet' = 'devnet'): string {
+export function getExplorerUrl(signature: string, network: 'devnet' | 'mainnet' = 'mainnet'): string {
   return `https://explorer.solana.com/tx/${signature}?cluster=${network}`;
 }
 

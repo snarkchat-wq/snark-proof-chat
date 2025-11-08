@@ -27,10 +27,10 @@ Deno.serve(async (req) => {
 
     console.log('Logging to Solana - Message ID:', messageId)
     console.log('Message Hash:', messageHash)
-    console.log('Transaction Signature:', transactionSignature)
+    console.log('Transaction signature:', transactionSignature)
 
-    // Verify transaction on Solana
-    const SOLANA_RPC = 'https://api.devnet.solana.com'
+    // Verify transaction on Solana Mainnet
+    const SOLANA_RPC = 'https://api.mainnet-beta.solana.com'
     
     const verifyResponse = await fetch(SOLANA_RPC, {
       method: 'POST',
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true,
         transactionSignature,
-        explorer: `https://explorer.solana.com/tx/${transactionSignature}?cluster=devnet`,
+        explorer: `https://explorer.solana.com/tx/${transactionSignature}`,
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
