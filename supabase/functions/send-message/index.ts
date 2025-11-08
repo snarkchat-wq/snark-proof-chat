@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import nacl from 'https://esm.sh/tweetnacl@1.0.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,8 @@ interface MessageRequest {
     proof: string
     publicInputs: any
   }
+  signature: string
+  timestamp: number
 }
 
 Deno.serve(async (req) => {
@@ -26,13 +29,56 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { walletAddress, encryptedContent, proofData }: MessageRequest = await req.json()
+    const { walletAddress, encryptedContent, proofData, signature, timestamp }: MessageRequest = await req.json()
 
     console.log('Received message from wallet:', walletAddress)
     console.log('Proof data:', proofData)
+    console.log('Signature:', signature)
 
-    // TODO: Implement actual zero-knowledge proof verification
-    // For now, we'll accept all proofs as valid
+    // Verify signature to authenticate wallet ownership
+    const authMessage = `SNARK:${walletAddress}:${timestamp}`
+    const messageBytes = new TextEncoder().encode(authMessage)
+    
+    // Convert hex signature to Uint8Array
+    const signatureBytes = new Uint8Array(
+      signature.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
+    )
+    
+    // Convert base58 public key to bytes
+    const publicKeyBytes = decodeBase58(walletAddress)
+    
+    const isValidSignature = nacl.sign.detached.verify(
+      messageBytes,
+      signatureBytes,
+      publicKeyBytes
+    )
+
+    console.log('Signature verification:', isValidSignature ? 'VALID' : 'INVALID')
+
+    if (!isValidSignature) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid wallet signature - authentication failed' }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Check timestamp to prevent replay attacks (within 5 minutes)
+    const now = Date.now()
+    if (Math.abs(now - timestamp) > 5 * 60 * 1000) {
+      return new Response(
+        JSON.stringify({ error: 'Signature expired - please try again' }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Verify zero-knowledge proof
+    // TODO: Implement actual gnark proof verification
     const isValidProof = true
 
     if (!isValidProof) {
@@ -46,13 +92,13 @@ Deno.serve(async (req) => {
     }
 
     // Insert message into database
-    const { data: message, error } = await supabase
+    const { data: messageData, error } = await supabase
       .from('messages')
       .insert({
         wallet_address: walletAddress,
         encrypted_content: encryptedContent,
         proof_data: proofData,
-        verified: isValidProof,
+        verified: isValidProof && isValidSignature,
       })
       .select()
       .single()
@@ -68,12 +114,12 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log('Message stored successfully:', message.id)
+    console.log('Message stored successfully:', messageData.id)
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        message,
+        message: messageData,
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -91,3 +137,25 @@ Deno.serve(async (req) => {
     )
   }
 })
+
+// Helper function to decode base58 (Solana public key format)
+function decodeBase58(str: string): Uint8Array {
+  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+  const ALPHABET_MAP = new Map(ALPHABET.split('').map((c, i) => [c, BigInt(i)]))
+  
+  let result = BigInt(0)
+  for (const char of str) {
+    const value = ALPHABET_MAP.get(char)
+    if (value === undefined) throw new Error('Invalid base58 character')
+    result = result * BigInt(58) + value
+  }
+  
+  // Convert BigInt to Uint8Array (32 bytes for Solana public key)
+  const bytes = new Uint8Array(32)
+  for (let i = 31; i >= 0; i--) {
+    bytes[i] = Number(result & BigInt(0xff))
+    result = result >> BigInt(8)
+  }
+  
+  return bytes
+}

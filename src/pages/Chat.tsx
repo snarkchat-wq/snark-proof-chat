@@ -12,9 +12,10 @@ const Chat = () => {
   const [message, setMessage] = useState("");
   const [showProofAnimation, setShowProofAnimation] = useState(false);
   const [selectedProof, setSelectedProof] = useState<string | null>(null);
+  const [showBlockchainAnimation, setShowBlockchainAnimation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  const { connected, publicKey } = usePhantomWallet();
+  const { wallet, connected, publicKey } = usePhantomWallet();
   const { messages, loading, sendMessage } = useRealtimeMessages();
   const { toast } = useToast();
 
@@ -25,7 +26,7 @@ const Chat = () => {
 
   const handleSendMessage = async () => {
     if (!message.trim()) return;
-    if (!connected || !publicKey) {
+    if (!connected || !publicKey || !wallet) {
       toast({
         title: "Wallet Not Connected",
         description: "Please connect your wallet first",
@@ -42,27 +43,35 @@ const Chat = () => {
         proof: "0x" + Math.random().toString(36).substring(2, 15) + "...",
         publicInputs: {
           timestamp: Date.now(),
-          messageHash: btoa(message).substring(0, 32),
+          walletAddress: publicKey,
         },
       };
 
-      await sendMessage(publicKey, message, proofData);
+      // Show blockchain animation
+      setTimeout(() => {
+        setShowProofAnimation(false);
+        setShowBlockchainAnimation(true);
+      }, 3000);
+
+      await sendMessage(wallet, message, proofData);
       
       setMessage("");
       
+      setTimeout(() => setShowBlockchainAnimation(false), 4000);
+      
       toast({
-        title: "Message Sent",
-        description: "Your message has been verified and logged",
+        title: "Message Sent ✅",
+        description: "Your message has been encrypted, verified, and logged to Solana",
       });
     } catch (error) {
       console.error('Failed to send message:', error);
+      setShowProofAnimation(false);
+      setShowBlockchainAnimation(false);
       toast({
         title: "Failed to Send",
-        description: "Could not send message. Please try again.",
+        description: error instanceof Error ? error.message : "Could not send message. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setTimeout(() => setShowProofAnimation(false), 3000);
     }
   };
 
@@ -129,12 +138,20 @@ const Chat = () => {
                     {msg.verified ? "✅ verified" : "❌ failed"}
                   </span>
                 </div>
-                <div className="text-foreground mb-2">{msg.encrypted_content}</div>
+                <div className="text-foreground mb-2">{msg.decryptedContent}</div>
                 <div className="text-xs text-muted-foreground space-y-1">
                   <div>Proof: {msg.proof_data.proof}</div>
                   {msg.blockchain_tx_hash && (
                     <div className="text-accent">
-                      ⛓️ Blockchain TX: {msg.blockchain_tx_hash.substring(0, 16)}...
+                      ⛓️ Blockchain: 
+                      <a 
+                        href={`https://explorer.solana.com/tx/${msg.blockchain_tx_hash}?cluster=devnet`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline ml-1"
+                      >
+                        {msg.blockchain_tx_hash.substring(0, 16)}...
+                      </a>
                     </div>
                   )}
                   <Button
@@ -158,6 +175,12 @@ const Chat = () => {
           {showProofAnimation && (
             <div className="border-2 border-accent p-4 bg-card/80">
               <ProofAnimation type="generate" />
+            </div>
+          )}
+
+          {showBlockchainAnimation && (
+            <div className="border-2 border-primary p-4 bg-card/80">
+              <ProofAnimation type="blockchain" />
             </div>
           )}
           
