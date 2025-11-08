@@ -1,13 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import TerminalHeader from "@/components/TerminalHeader";
 import { usePhantomWallet } from "@/hooks/usePhantomWallet";
 import { useToast } from "@/hooks/use-toast";
+import { isAdmin } from "@/lib/tokenGating";
 
 const Index = () => {
   const { connected, publicKey, connect, isInstalled } = usePhantomWallet();
   const { toast } = useToast();
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
+
+  useEffect(() => {
+    if (connected && publicKey) {
+      checkAdminStatus();
+    }
+  }, [connected, publicKey]);
+
+  const checkAdminStatus = async () => {
+    if (!publicKey) return;
+    
+    try {
+      const adminStatus = await isAdmin(publicKey.toString());
+      setIsUserAdmin(adminStatus);
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+    }
+  };
 
   const connectWallet = async () => {
     try {
@@ -114,6 +133,13 @@ const Index = () => {
                       [HOW IT WORKS]
                     </Button>
                   </Link>
+                  {isUserAdmin && (
+                    <Link to="/admin" className="flex-1">
+                      <Button variant="outline" size="lg" className="w-full border-accent text-accent">
+                        [ADMIN]
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </div>
             )}
