@@ -20,7 +20,7 @@ echo "📦 Installing circomlib..."
 npm install --save-dev circomlib
 
 echo "🔨 Compiling circuit..."
-circom $CIRCUIT_DIR/$CIRCUIT_NAME.circom --r1cs --wasm --sym -o $BUILD_DIR
+circom2 $CIRCUIT_DIR/$CIRCUIT_NAME.circom --r1cs --wasm --sym -o $BUILD_DIR
 
 echo "📥 Downloading Powers of Tau (Phase 1 trusted setup)..."
 # Using Hermez's ceremony (perpetual powers of tau)
