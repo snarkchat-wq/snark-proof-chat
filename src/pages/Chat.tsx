@@ -8,12 +8,17 @@ import ProofDetails from "@/components/ProofDetails";
 import { usePhantomWallet } from "@/hooks/usePhantomWallet";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { useToast } from "@/hooks/use-toast";
+import { checkTokenGating, isAdmin } from "@/lib/tokenGating";
 
 const Chat = () => {
   const [message, setMessage] = useState("");
   const [showProofAnimation, setShowProofAnimation] = useState(false);
   const [selectedProof, setSelectedProof] = useState<string | null>(null);
   const [showBlockchainAnimation, setShowBlockchainAnimation] = useState(false);
+  const [tokenBalance, setTokenBalance] = useState<number | null>(null);
+  const [tokenRequired, setTokenRequired] = useState<number | null>(null);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const { wallet, connected, publicKey } = usePhantomWallet();
@@ -25,12 +30,60 @@ const Chat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    if (connected && publicKey) {
+      checkTokenAccess();
+      checkAdminStatus();
+    }
+  }, [connected, publicKey]);
+
+  const checkTokenAccess = async () => {
+    if (!publicKey) return;
+    
+    try {
+      const result = await checkTokenGating(publicKey.toString());
+      setTokenBalance(result.balance);
+      setTokenRequired(result.required);
+      setHasAccess(result.allowed);
+      
+      if (!result.allowed) {
+        toast({
+          title: "Insufficient Token Balance",
+          description: `You need ${result.required.toLocaleString()} tokens to send messages. Current balance: ${result.balance.toLocaleString()}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error checking token access:', error);
+    }
+  };
+
+  const checkAdminStatus = async () => {
+    if (!publicKey) return;
+    
+    try {
+      const adminStatus = await isAdmin(publicKey.toString());
+      setIsUserAdmin(adminStatus);
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!message.trim()) return;
     if (!connected || !publicKey || !wallet) {
       toast({
         title: "Wallet Not Connected",
         description: "Please connect your wallet first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!hasAccess) {
+      toast({
+        title: "Access Denied",
+        description: `You need ${tokenRequired?.toLocaleString()} tokens to send messages. Current balance: ${tokenBalance?.toLocaleString()}`,
         variant: "destructive",
       });
       return;
@@ -104,7 +157,19 @@ const Chat = () => {
               [ABOUT]
             </Button>
           </Link>
-          <div className="ml-auto text-primary font-mono text-sm flex items-center">
+          {isUserAdmin && (
+            <Link to="/admin">
+              <Button variant="ghost" size="sm" className="text-accent hover:text-accent">
+                [ADMIN]
+              </Button>
+            </Link>
+          )}
+          <div className="ml-auto text-primary font-mono text-sm flex items-center gap-4">
+            {connected && tokenRequired && (
+              <span className={hasAccess ? "text-primary" : "text-destructive"}>
+                {hasAccess ? "✅" : "❌"} {tokenBalance?.toLocaleString()}/{tokenRequired.toLocaleString()} tokens
+              </span>
+            )}
             <span className="text-accent">&gt;</span> WALLET: {connected ? formatWalletAddress(publicKey || '') : 'NOT CONNECTED'}
           </div>
         </div>
@@ -218,6 +283,11 @@ const Chat = () => {
           </div>
           <p className="text-xs text-muted-foreground mt-2 font-mono">
             <span className="text-accent">&gt;</span> Press Enter to send • Messages are encrypted and verified with ZK proofs • Logged to Solana Mainnet
+            {connected && tokenRequired && (
+              <span className={hasAccess ? "text-primary" : "text-destructive"}>
+                {" • "}Token Gated: {tokenBalance?.toLocaleString()}/{tokenRequired.toLocaleString()} required
+              </span>
+            )}
           </p>
         </div>
       </div>

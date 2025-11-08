@@ -1,1 +1,10 @@
 project_id = "pmumdlscexdlunkoyhqw"
+
+[functions.send-message]
+verify_jwt = false
+
+[functions.log-to-solana]
+verify_jwt = false
+
+[functions.verify-token-balance]
+verify_jwt = false

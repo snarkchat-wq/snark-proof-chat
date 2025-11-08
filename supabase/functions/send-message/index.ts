@@ -77,6 +77,57 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Verify token gating requirement
+    const { data: tokenRequirements } = await supabase
+      .from('token_requirements')
+      .select('token_mint_address, threshold_amount')
+      .single()
+
+    if (tokenRequirements) {
+      // Check SPL token balance via Solana RPC
+      const SOLANA_RPC = 'https://api.mainnet-beta.solana.com'
+      const balanceResponse = await fetch(SOLANA_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getTokenAccountsByOwner',
+          params: [
+            walletAddress,
+            { mint: tokenRequirements.token_mint_address },
+            { encoding: 'jsonParsed' },
+          ],
+        }),
+      })
+
+      const balanceData = await balanceResponse.json()
+      let totalBalance = 0
+
+      if (balanceData.result && balanceData.result.value) {
+        for (const account of balanceData.result.value) {
+          const amount = account.account.data.parsed.info.tokenAmount.uiAmount || 0
+          totalBalance += amount
+        }
+      }
+
+      console.log(`Token balance check: ${totalBalance} / ${tokenRequirements.threshold_amount} required`)
+
+      if (totalBalance < tokenRequirements.threshold_amount) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Insufficient token balance',
+            balance: totalBalance,
+            required: tokenRequirements.threshold_amount
+          }),
+          { 
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
+    }
+
     // Verify zero-knowledge proof
     // TODO: Implement actual gnark proof verification
     const isValidProof = true
