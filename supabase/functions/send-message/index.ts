@@ -77,7 +77,9 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Verify token gating requirement
+    // Verify token gating requirement using edge function
+    console.log('Checking token balance via verify-token-balance edge function...')
+    
     const { data: tokenRequirements, error: tokenError } = await supabase
       .from('token_requirements')
       .select('token_mint_address, threshold_amount')
@@ -88,41 +90,38 @@ Deno.serve(async (req) => {
     console.log('Token requirements:', tokenRequirements, 'Error:', tokenError)
 
     if (tokenRequirements) {
-      // Check SPL token balance via Solana RPC
-      const SOLANA_RPC = 'https://api.mainnet-beta.solana.com'
-      const balanceResponse = await fetch(SOLANA_RPC, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'getTokenAccountsByOwner',
-          params: [
+      const { data: balanceCheck, error: balanceError } = await supabase.functions.invoke(
+        'verify-token-balance',
+        {
+          body: {
             walletAddress,
-            { mint: tokenRequirements.token_mint_address },
-            { encoding: 'jsonParsed' },
-          ],
-        }),
-      })
-
-      const balanceData = await balanceResponse.json()
-      let totalBalance = 0
-
-      if (balanceData.result && balanceData.result.value) {
-        for (const account of balanceData.result.value) {
-          const amount = account.account.data.parsed.info.tokenAmount.uiAmount || 0
-          totalBalance += amount
+            tokenMintAddress: tokenRequirements.token_mint_address,
+          },
         }
+      )
+
+      if (balanceError) {
+        console.error('Token balance check error:', balanceError)
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to verify token balance',
+            details: balanceError.message
+          }),
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
       }
 
-      console.log(`Token balance check: ${totalBalance} / ${tokenRequirements.threshold_amount} required`)
+      console.log(`Token balance check: ${balanceCheck.balance} / ${balanceCheck.required} required`)
 
-      if (totalBalance < tokenRequirements.threshold_amount) {
+      if (!balanceCheck.hasAccess) {
         return new Response(
           JSON.stringify({ 
             error: 'Insufficient token balance',
-            balance: totalBalance,
-            required: tokenRequirements.threshold_amount
+            balance: balanceCheck.balance,
+            required: balanceCheck.required
           }),
           { 
             status: 403,
@@ -132,29 +131,37 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Verify zero-knowledge proof using dedicated verification function
+    // Verify zero-knowledge proof using Supabase function invoke
     console.log('Verifying ZK proof...')
     
-    const zkVerifyResponse = await fetch(
-      `${Deno.env.get('SUPABASE_URL')}/functions/v1/verify-zk-proof`,
+    const { data: zkResult, error: zkError } = await supabase.functions.invoke(
+      'verify-zk-proof',
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-        },
-        body: JSON.stringify({
+        body: {
           proof: proofData.proof,
           publicSignals: [
             proofData.publicInputs.threshold,
             proofData.publicInputs.commitment,
           ],
-        }),
+        },
       }
     )
 
-    const zkResult = await zkVerifyResponse.json()
-    const isValidProof = zkResult.verified
+    if (zkError) {
+      console.error('ZK proof verification error:', zkError)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to verify zero-knowledge proof',
+          details: zkError.message
+        }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    const isValidProof = zkResult?.verified ?? false
 
     console.log('ZK proof verification result:', isValidProof ? 'VALID' : 'INVALID')
 
