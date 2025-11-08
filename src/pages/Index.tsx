@@ -41,6 +41,7 @@ const Index = () => {
       }
 
       await connect();
+      await checkAdminStatus();
       toast({
         title: "Wallet Connected",
         description: "Successfully connected to Phantom wallet",
