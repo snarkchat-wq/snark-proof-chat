@@ -78,10 +78,14 @@ Deno.serve(async (req) => {
     }
 
     // Verify token gating requirement
-    const { data: tokenRequirements } = await supabase
+    const { data: tokenRequirements, error: tokenError } = await supabase
       .from('token_requirements')
       .select('token_mint_address, threshold_amount')
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    console.log('Token requirements:', tokenRequirements, 'Error:', tokenError)
 
     if (tokenRequirements) {
       // Check SPL token balance via Solana RPC
