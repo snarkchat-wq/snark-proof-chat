@@ -140,9 +140,10 @@ const ProofDetails = ({
       {/* Technical Info */}
       <div className="border-t border-accent/30 pt-2 space-y-1">
         <div className="text-muted-foreground text-[10px]">
-          <div>Circuit: gnark (mock)</div>
+          <div>Circuit: tokenBalance.circom (Circom)</div>
+          <div>Proving System: Groth16 (bn128 curve)</div>
           <div>Algorithm: Zero-Knowledge Succinct Non-Interactive Argument of Knowledge</div>
-          <div>Security: Cryptographic proof without revealing secret</div>
+          <div>Security: Cryptographic proof without revealing secret balance</div>
         </div>
       </div>
 
