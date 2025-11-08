@@ -27,7 +27,7 @@ export async function getTokenRequirements(): Promise<TokenRequirement | null> {
   const { data, error } = await supabase
     .from('token_requirements')
     .select('*')
-    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
