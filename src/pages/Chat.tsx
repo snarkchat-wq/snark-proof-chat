@@ -38,10 +38,17 @@ const Chat = () => {
   }, [connected, publicKey]);
 
   const checkTokenAccess = async () => {
-    if (!publicKey) return;
+    if (!publicKey) {
+      console.error('No publicKey available for token check');
+      return;
+    }
+    
+    console.log('Checking token access for wallet:', publicKey);
     
     try {
       const result = await checkTokenGating(publicKey.toString());
+      console.log('Token gating result:', result);
+      
       setTokenBalance(result.balance);
       setTokenRequired(result.required);
       setHasAccess(result.allowed);
@@ -52,9 +59,16 @@ const Chat = () => {
           description: `You need ${result.required.toLocaleString()} tokens to send messages. Current balance: ${result.balance.toLocaleString()}`,
           variant: "destructive",
         });
+      } else {
+        console.log(`✅ Token access granted: ${result.balance}/${result.required}`);
       }
     } catch (error) {
       console.error('Error checking token access:', error);
+      toast({
+        title: "Token Check Failed",
+        description: error instanceof Error ? error.message : "Unable to verify token balance",
+        variant: "destructive",
+      });
     }
   };
 

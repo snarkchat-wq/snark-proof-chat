@@ -29,6 +29,9 @@ export async function getSPLTokenBalance(
   tokenMintAddress: string
 ): Promise<number> {
   try {
+    console.log('Fetching token balance for wallet:', walletAddress);
+    console.log('Token mint address:', tokenMintAddress);
+    
     const walletPubkey = new PublicKey(walletAddress);
     const mintPubkey = new PublicKey(tokenMintAddress);
 
@@ -38,43 +41,56 @@ export async function getSPLTokenBalance(
       { mint: mintPubkey }
     );
 
+    console.log('Token accounts found:', tokenAccounts.value.length);
+
     if (tokenAccounts.value.length === 0) {
+      console.log('No token accounts found for this mint');
       return 0;
     }
 
     // Sum up all token balances from all accounts
     const totalBalance = tokenAccounts.value.reduce((sum, account) => {
       const amount = account.account.data.parsed.info.tokenAmount.uiAmount || 0;
+      console.log('Token account balance:', amount);
       return sum + amount;
     }, 0);
 
+    console.log('Total token balance:', totalBalance);
     return totalBalance;
   } catch (error) {
     console.error('Error fetching SPL token balance:', error);
-    return 0;
+    throw error; // Re-throw to propagate the error
   }
 }
 
 export async function checkTokenGating(
   walletAddress: string
 ): Promise<{ allowed: boolean; balance: number; required: number; tokenMint: string }> {
+  console.log('Starting token gating check for:', walletAddress);
+  
   const requirements = await getTokenRequirements();
   
   if (!requirements) {
+    console.error('Token requirements not found in database');
     throw new Error('Token requirements not configured');
   }
+
+  console.log('Token requirements:', requirements);
 
   const balance = await getSPLTokenBalance(
     walletAddress,
     requirements.token_mint_address
   );
 
-  return {
+  const result = {
     allowed: balance >= requirements.threshold_amount,
     balance,
     required: requirements.threshold_amount,
     tokenMint: requirements.token_mint_address,
   };
+
+  console.log('Token gating check result:', result);
+  return result;
 }
 
 export async function isAdmin(walletAddress: string): Promise<boolean> {
