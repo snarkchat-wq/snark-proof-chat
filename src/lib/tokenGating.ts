@@ -4,8 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 // Use a more reliable RPC endpoint with retry logic
 const SOLANA_RPC_ENDPOINTS = [
   'https://api.mainnet-beta.solana.com',
-  'https://solana-api.projectserum.com',
-  'https://rpc.ankr.com/solana',
+  'https://solana.public-rpc.com',
 ];
 
 let currentEndpointIndex = 0;
@@ -51,7 +50,7 @@ export async function getSPLTokenBalance(
   console.log('🔍 Fetching token balance for wallet:', walletAddress);
   console.log('🪙 Token mint address:', tokenMintAddress);
   
-  const maxRetries = 3;
+  const maxRetries = 2;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -102,6 +101,33 @@ export async function getSPLTokenBalance(
   throw lastError || new Error('Failed to fetch token balance after multiple attempts');
 }
 
+// Prefer server-side balance checks to avoid browser RPC and API key limits
+async function getSPLTokenBalanceViaEdge(walletAddress: string, tokenMintAddress: string) {
+  try {
+    console.log('🌐 Invoking backend verify-token-balance...');
+    const { data, error } = await supabase.functions.invoke('verify-token-balance', {
+      body: { walletAddress, tokenMintAddress },
+    });
+
+    if (error) {
+      console.error('Edge function error:', error);
+      throw error;
+    }
+
+    if (!data) throw new Error('No data from verify-token-balance');
+
+    const balance = Number(data.balance ?? 0);
+    const required = Number(data.required ?? 0);
+    const hasAccess = Boolean(data.hasAccess ?? (balance >= required));
+
+    console.log('✅ Backend balance result:', { balance, required, hasAccess });
+    return { balance, required, hasAccess };
+  } catch (e) {
+    console.error('❌ Backend balance check failed, will fallback to client RPC:', e);
+    throw e;
+  }
+}
+
 export async function checkTokenGating(
   walletAddress: string
 ): Promise<{ allowed: boolean; balance: number; required: number; tokenMint: string }> {
@@ -116,20 +142,39 @@ export async function checkTokenGating(
 
   console.log('Token requirements:', requirements);
 
-  const balance = await getSPLTokenBalance(
-    walletAddress,
-    requirements.token_mint_address
-  );
+  try {
+    // 1) Try backend for speed and reliability
+    const backend = await getSPLTokenBalanceViaEdge(
+      walletAddress,
+      requirements.token_mint_address
+    );
 
-  const result = {
-    allowed: balance >= requirements.threshold_amount,
-    balance,
-    required: requirements.threshold_amount,
-    tokenMint: requirements.token_mint_address,
-  };
+    const result = {
+      allowed: backend.hasAccess,
+      balance: backend.balance,
+      required: backend.required || requirements.threshold_amount,
+      tokenMint: requirements.token_mint_address,
+    };
 
-  console.log('Token gating check result:', result);
-  return result;
+    console.log('Token gating check result (backend):', result);
+    return result;
+  } catch {
+    // 2) Fallback to client RPC if backend not available
+    const balance = await getSPLTokenBalance(
+      walletAddress,
+      requirements.token_mint_address
+    );
+
+    const result = {
+      allowed: balance >= requirements.threshold_amount,
+      balance,
+      required: requirements.threshold_amount,
+      tokenMint: requirements.token_mint_address,
+    };
+
+    console.log('Token gating check result (client fallback):', result);
+    return result;
+  }
 }
 
 export async function isAdmin(walletAddress: string): Promise<boolean> {

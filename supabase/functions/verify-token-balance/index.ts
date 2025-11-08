@@ -61,22 +61,26 @@ serve(async (req) => {
       }
     }
 
-    // Get token requirements
+    // Get latest token requirements
     const { data: requirements, error: reqError } = await supabase
       .from('token_requirements')
       .select('threshold_amount')
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (reqError) {
       throw new Error(`Failed to fetch token requirements: ${reqError.message}`);
     }
 
-    const hasAccess = totalBalance >= requirements.threshold_amount;
+    const requiredThreshold = (requirements?.threshold_amount ?? 0) as number;
+
+    const hasAccess = totalBalance >= requiredThreshold;
 
     return new Response(
       JSON.stringify({
         balance: totalBalance,
-        required: requirements.threshold_amount,
+        required: requiredThreshold,
         hasAccess,
       }),
       {
