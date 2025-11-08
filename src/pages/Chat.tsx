@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import TerminalHeader from "@/components/TerminalHeader";
 import ProofAnimation from "@/components/ProofAnimation";
+import ProofDetails from "@/components/ProofDetails";
 import { usePhantomWallet } from "@/hooks/usePhantomWallet";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { useToast } from "@/hooks/use-toast";
@@ -163,8 +164,14 @@ const Chat = () => {
                     [{selectedProof === msg.id ? "Hide" : "Show"} Proof Details]
                   </Button>
                   {selectedProof === msg.id && (
-                    <div className="mt-2 border border-accent/30 p-2 bg-background/80">
-                      <ProofAnimation type="verify" />
+                    <div className="mt-2">
+                      <ProofDetails 
+                        proofData={msg.proof_data}
+                        verified={msg.verified}
+                        timestamp={msg.created_at}
+                        walletAddress={msg.wallet_address}
+                        blockchainTxHash={msg.blockchain_tx_hash}
+                      />
                     </div>
                   )}
                 </div>
