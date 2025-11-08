@@ -95,9 +95,13 @@ const Chat = () => {
     }
 
     if (!hasAccess) {
+      // Attempt a fresh check to populate values if missing
+      try { await checkTokenAccess(); } catch {}
+      const requiredText = tokenRequired != null ? tokenRequired.toLocaleString() : 'the required';
+      const balanceText = tokenBalance != null ? tokenBalance.toLocaleString() : '0';
       toast({
         title: "Access Denied",
-        description: `You need ${tokenRequired?.toLocaleString()} tokens to send messages. Current balance: ${tokenBalance?.toLocaleString()}`,
+        description: `You need ${requiredText} tokens to send messages. Current balance: ${balanceText}`,
         variant: "destructive",
       });
       return;

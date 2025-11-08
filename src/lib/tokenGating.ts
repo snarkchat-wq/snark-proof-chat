@@ -14,10 +14,17 @@ export async function getTokenRequirements(): Promise<TokenRequirement | null> {
   const { data, error } = await supabase
     .from('token_requirements')
     .select('*')
-    .single();
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (error) {
     console.error('Error fetching token requirements:', error);
+    return null;
+  }
+
+  if (!data) {
+    console.warn('No token requirements row found');
     return null;
   }
 
