@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.verify-zk-proof]
 verify_jwt = false
+
+[functions.upload-verification-key]
+verify_jwt = false
