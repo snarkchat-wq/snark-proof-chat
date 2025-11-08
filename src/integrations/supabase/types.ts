@@ -14,7 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      messages: {
+        Row: {
+          blockchain_tx_hash: string | null
+          created_at: string
+          encrypted_content: string
+          id: string
+          proof_data: Json
+          verified: boolean
+          wallet_address: string
+        }
+        Insert: {
+          blockchain_tx_hash?: string | null
+          created_at?: string
+          encrypted_content: string
+          id?: string
+          proof_data: Json
+          verified?: boolean
+          wallet_address: string
+        }
+        Update: {
+          blockchain_tx_hash?: string | null
+          created_at?: string
+          encrypted_content?: string
+          id?: string
+          proof_data?: Json
+          verified?: boolean
+          wallet_address?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

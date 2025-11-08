@@ -1,51 +1,80 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import TerminalHeader from "@/components/TerminalHeader";
 import ProofAnimation from "@/components/ProofAnimation";
-
-interface Message {
-  id: number;
-  walletAddress: string;
-  encryptedContent: string;
-  proof: string;
-  verified: boolean;
-  timestamp: string;
-}
+import { usePhantomWallet } from "@/hooks/usePhantomWallet";
+import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
+import { useToast } from "@/hooks/use-toast";
 
 const Chat = () => {
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      walletAddress: "7f3xAb2c8...",
-      encryptedContent: "(encrypted)",
-      proof: "0x8a7b4c2d9f3e1a5b...",
-      verified: true,
-      timestamp: "12:00",
-    },
-  ]);
   const [showProofAnimation, setShowProofAnimation] = useState(false);
-  const [selectedProof, setSelectedProof] = useState<number | null>(null);
+  const [selectedProof, setSelectedProof] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const { connected, publicKey } = usePhantomWallet();
+  const { messages, loading, sendMessage } = useRealtimeMessages();
+  const { toast } = useToast();
 
-  const handleSendMessage = () => {
+  useEffect(() => {
+    // Auto-scroll to bottom when new messages arrive
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSendMessage = async () => {
     if (!message.trim()) return;
+    if (!connected || !publicKey) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet first",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setShowProofAnimation(true);
-    setTimeout(() => {
-      const newMessage: Message = {
-        id: messages.length + 1,
-        walletAddress: "7f3x" + Math.random().toString(36).substring(2, 6) + "...",
-        encryptedContent: "(encrypted)",
+    
+    try {
+      // Generate mock proof data (in production, this would use gnark WASM)
+      const proofData = {
         proof: "0x" + Math.random().toString(36).substring(2, 15) + "...",
-        verified: true,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        publicInputs: {
+          timestamp: Date.now(),
+          messageHash: btoa(message).substring(0, 32),
+        },
       };
-      setMessages([...messages, newMessage]);
+
+      await sendMessage(publicKey, message, proofData);
+      
       setMessage("");
-      setShowProofAnimation(false);
-    }, 4000);
+      
+      toast({
+        title: "Message Sent",
+        description: "Your message has been verified and logged",
+      });
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      toast({
+        title: "Failed to Send",
+        description: "Could not send message. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTimeout(() => setShowProofAnimation(false), 3000);
+    }
+  };
+
+  const formatWalletAddress = (address: string) => {
+    return `${address.substring(0, 4)}...${address.substring(address.length - 4)}`;
+  };
+
+  const formatTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
   };
 
   return (
@@ -66,7 +95,7 @@ const Chat = () => {
             </Button>
           </Link>
           <div className="ml-auto text-primary font-mono text-sm flex items-center">
-            <span className="text-accent">&gt;</span> WALLET: 7f3x...ab2
+            <span className="text-accent">&gt;</span> WALLET: {connected ? formatWalletAddress(publicKey || '') : 'NOT CONNECTED'}
           </div>
         </div>
 
@@ -76,43 +105,63 @@ const Chat = () => {
             <pre className="text-xs">
 {`====================================
    SNARK // Zero-Knowledge Chat
+   🔴 LIVE // Real-time enabled
 ====================================`}
             </pre>
           </div>
 
-          {messages.map((msg) => (
-            <div key={msg.id} className="border border-primary/50 p-3 bg-background/50">
-              <div className="flex items-start justify-between mb-2">
-                <span className="text-primary">[{msg.timestamp}] &lt;{msg.walletAddress}&gt;</span>
-                <span className={msg.verified ? "text-primary" : "text-destructive"}>
-                  {msg.verified ? "✅ verified" : "❌ failed"}
-                </span>
-              </div>
-              <div className="text-foreground mb-2">{msg.encryptedContent}</div>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <div>Proof: {msg.proof}</div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-accent hover:text-accent h-auto p-0 text-xs"
-                  onClick={() => setSelectedProof(selectedProof === msg.id ? null : msg.id)}
-                >
-                  [{selectedProof === msg.id ? "Hide" : "Show"} Proof Details]
-                </Button>
-                {selectedProof === msg.id && (
-                  <div className="mt-2 border border-accent/30 p-2 bg-background/80">
-                    <ProofAnimation type="verify" />
-                  </div>
-                )}
-              </div>
+          {loading ? (
+            <div className="text-primary text-center">
+              <span className="text-accent">&gt;</span> Loading messages...
             </div>
-          ))}
+          ) : messages.length === 0 ? (
+            <div className="text-muted-foreground text-center">
+              <span className="text-accent">&gt;</span> No messages yet. Be the first to send one!
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <div key={msg.id} className="border border-primary/50 p-3 bg-background/50">
+                <div className="flex items-start justify-between mb-2">
+                  <span className="text-primary">
+                    [{formatTime(msg.created_at)}] &lt;{formatWalletAddress(msg.wallet_address)}&gt;
+                  </span>
+                  <span className={msg.verified ? "text-primary" : "text-destructive"}>
+                    {msg.verified ? "✅ verified" : "❌ failed"}
+                  </span>
+                </div>
+                <div className="text-foreground mb-2">{msg.encrypted_content}</div>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div>Proof: {msg.proof_data.proof}</div>
+                  {msg.blockchain_tx_hash && (
+                    <div className="text-accent">
+                      ⛓️ Blockchain TX: {msg.blockchain_tx_hash.substring(0, 16)}...
+                    </div>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-accent hover:text-accent h-auto p-0 text-xs"
+                    onClick={() => setSelectedProof(selectedProof === msg.id ? null : msg.id)}
+                  >
+                    [{selectedProof === msg.id ? "Hide" : "Show"} Proof Details]
+                  </Button>
+                  {selectedProof === msg.id && (
+                    <div className="mt-2 border border-accent/30 p-2 bg-background/80">
+                      <ProofAnimation type="verify" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
 
           {showProofAnimation && (
             <div className="border-2 border-accent p-4 bg-card/80">
               <ProofAnimation type="generate" />
             </div>
           )}
+          
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Input area */}
@@ -124,15 +173,15 @@ const Chat = () => {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                placeholder="type your message"
+                placeholder={connected ? "type your message" : "connect wallet first"}
                 className="pl-8 bg-input border-primary font-mono text-foreground placeholder:text-muted-foreground"
-                disabled={showProofAnimation}
+                disabled={showProofAnimation || !connected}
               />
             </div>
             <Button
               variant="terminal"
               onClick={handleSendMessage}
-              disabled={showProofAnimation}
+              disabled={showProofAnimation || !connected}
             >
               [SEND]
             </Button>

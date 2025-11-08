@@ -2,16 +2,38 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import TerminalHeader from "@/components/TerminalHeader";
+import { usePhantomWallet } from "@/hooks/usePhantomWallet";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState("");
+  const { connected, publicKey, connect, isInstalled } = usePhantomWallet();
+  const { toast } = useToast();
 
   const connectWallet = async () => {
-    // Mock wallet connection - in production this would integrate with Phantom
-    const mockAddress = "7f3x" + Math.random().toString(36).substring(2, 9) + "ab2";
-    setWalletAddress(mockAddress);
-    setWalletConnected(true);
+    try {
+      if (!isInstalled) {
+        toast({
+          title: "Phantom Not Installed",
+          description: "Please install Phantom wallet extension to continue",
+          variant: "destructive",
+        });
+        window.open('https://phantom.app/', '_blank');
+        return;
+      }
+
+      await connect();
+      toast({
+        title: "Wallet Connected",
+        description: "Successfully connected to Phantom wallet",
+      });
+    } catch (error) {
+      console.error('Failed to connect wallet:', error);
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect to Phantom wallet",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -51,11 +73,16 @@ const Index = () => {
               CONNECTION REQUIRED
             </h3>
             
-            {!walletConnected ? (
+            {!connected ? (
               <div className="space-y-4">
                 <p className="text-foreground font-mono text-sm">
                   <span className="text-accent">&gt;</span> Connect your Phantom Wallet to access the chat
                 </p>
+                {!isInstalled && (
+                  <p className="text-destructive font-mono text-xs">
+                    <span className="text-accent">&gt;</span> Phantom wallet not detected. Click to install.
+                  </p>
+                )}
                 <Button 
                   variant="terminal-cyan" 
                   size="lg"
@@ -71,8 +98,8 @@ const Index = () => {
                   <p className="text-primary">
                     <span className="text-accent">&gt;</span> Wallet connected successfully ✅
                   </p>
-                  <p className="text-muted-foreground">
-                    <span className="text-accent">&gt;</span> Address: [{walletAddress}]
+                  <p className="text-muted-foreground break-all">
+                    <span className="text-accent">&gt;</span> Address: [{publicKey?.substring(0, 4)}...{publicKey?.substring(publicKey.length - 4)}]
                   </p>
                 </div>
                 
