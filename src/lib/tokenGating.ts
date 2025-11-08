@@ -1,8 +1,21 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { supabase } from '@/integrations/supabase/client';
 
-const SOLANA_RPC = 'https://api.mainnet-beta.solana.com';
-const connection = new Connection(SOLANA_RPC, 'confirmed');
+// Use a more reliable RPC endpoint with retry logic
+const SOLANA_RPC_ENDPOINTS = [
+  'https://api.mainnet-beta.solana.com',
+  'https://solana-api.projectserum.com',
+  'https://rpc.ankr.com/solana',
+];
+
+let currentEndpointIndex = 0;
+
+const getConnection = () => {
+  return new Connection(SOLANA_RPC_ENDPOINTS[currentEndpointIndex], {
+    commitment: 'confirmed',
+    confirmTransactionInitialTimeout: 60000,
+  });
+};
 
 export interface TokenRequirement {
   id: string;
@@ -35,39 +48,58 @@ export async function getSPLTokenBalance(
   walletAddress: string,
   tokenMintAddress: string
 ): Promise<number> {
-  try {
-    console.log('Fetching token balance for wallet:', walletAddress);
-    console.log('Token mint address:', tokenMintAddress);
-    
-    const walletPubkey = new PublicKey(walletAddress);
-    const mintPubkey = new PublicKey(tokenMintAddress);
+  console.log('🔍 Fetching token balance for wallet:', walletAddress);
+  console.log('🪙 Token mint address:', tokenMintAddress);
+  
+  const maxRetries = 3;
+  let lastError: Error | null = null;
 
-    // Get token accounts for the wallet
-    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-      walletPubkey,
-      { mint: mintPubkey }
-    );
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const connection = getConnection();
+      const walletPubkey = new PublicKey(walletAddress);
+      const mintPubkey = new PublicKey(tokenMintAddress);
 
-    console.log('Token accounts found:', tokenAccounts.value.length);
+      console.log(`⏳ Attempt ${attempt + 1}/${maxRetries} - Querying Solana RPC...`);
 
-    if (tokenAccounts.value.length === 0) {
-      console.log('No token accounts found for this mint');
-      return 0;
+      // Get token accounts for the wallet
+      const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+        walletPubkey,
+        { mint: mintPubkey }
+      );
+
+      console.log(`📊 Token accounts found: ${tokenAccounts.value.length}`);
+
+      if (tokenAccounts.value.length === 0) {
+        console.log('⚠️ No token accounts found for this mint - balance is 0');
+        return 0;
+      }
+
+      // Sum up all token balances from all accounts
+      const totalBalance = tokenAccounts.value.reduce((sum, account) => {
+        const amount = account.account.data.parsed.info.tokenAmount.uiAmount || 0;
+        const decimals = account.account.data.parsed.info.tokenAmount.decimals;
+        console.log(`💰 Token account balance: ${amount} (decimals: ${decimals})`);
+        return sum + amount;
+      }, 0);
+
+      console.log(`✅ Total token balance: ${totalBalance}`);
+      return totalBalance;
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`❌ Attempt ${attempt + 1} failed:`, error);
+      
+      // Try next RPC endpoint on next attempt
+      if (attempt < maxRetries - 1) {
+        currentEndpointIndex = (currentEndpointIndex + 1) % SOLANA_RPC_ENDPOINTS.length;
+        console.log(`🔄 Retrying with endpoint: ${SOLANA_RPC_ENDPOINTS[currentEndpointIndex]}`);
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+      }
     }
-
-    // Sum up all token balances from all accounts
-    const totalBalance = tokenAccounts.value.reduce((sum, account) => {
-      const amount = account.account.data.parsed.info.tokenAmount.uiAmount || 0;
-      console.log('Token account balance:', amount);
-      return sum + amount;
-    }, 0);
-
-    console.log('Total token balance:', totalBalance);
-    return totalBalance;
-  } catch (error) {
-    console.error('Error fetching SPL token balance:', error);
-    throw error; // Re-throw to propagate the error
   }
+
+  console.error('❌ All retry attempts failed');
+  throw lastError || new Error('Failed to fetch token balance after multiple attempts');
 }
 
 export async function checkTokenGating(
