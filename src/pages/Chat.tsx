@@ -39,15 +39,18 @@ const Chat = () => {
 
   const checkTokenAccess = async () => {
     if (!publicKey) {
-      console.error('No publicKey available for token check');
+      console.error('❌ No publicKey available for token check');
       return;
     }
     
-    console.log('Checking token access for wallet:', publicKey);
+    // Verify we have the FULL wallet address, not truncated
+    console.log('🔑 Full wallet address being checked:', publicKey);
+    console.log('📏 Wallet address length:', publicKey.length);
+    console.log('✅ Is valid Solana address length?', publicKey.length >= 32 && publicKey.length <= 44);
     
     try {
-      const result = await checkTokenGating(publicKey.toString());
-      console.log('Token gating result:', result);
+      const result = await checkTokenGating(publicKey);
+      console.log('📋 Token gating result:', result);
       
       setTokenBalance(result.balance);
       setTokenRequired(result.required);
@@ -63,7 +66,7 @@ const Chat = () => {
         console.log(`✅ Token access granted: ${result.balance}/${result.required}`);
       }
     } catch (error) {
-      console.error('Error checking token access:', error);
+      console.error('❌ Error checking token access:', error);
       toast({
         title: "Token Check Failed",
         description: error instanceof Error ? error.message : "Unable to verify token balance",
