@@ -5,9 +5,11 @@
   "main": "api/verify.js",
   "scripts": {
     "dev": "vercel dev",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "start": "node server.js"
   },
   "dependencies": {
+    "express": "^4.19.2",
     "snarkjs": "^0.7.5"
   },
   "engines": {
