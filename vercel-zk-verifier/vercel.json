@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/verify.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/verify",
+      "dest": "api/verify.js"
+    }
+  ],
+  "functions": {
+    "api/verify.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
+}
