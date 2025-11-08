@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.verify-token-balance]
 verify_jwt = false
+
+[functions.verify-zk-proof]
+verify_jwt = false

@@ -128,9 +128,31 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Verify zero-knowledge proof
-    // TODO: Implement actual gnark proof verification
-    const isValidProof = true
+    // Verify zero-knowledge proof using dedicated verification function
+    console.log('Verifying ZK proof...')
+    
+    const zkVerifyResponse = await fetch(
+      `${Deno.env.get('SUPABASE_URL')}/functions/v1/verify-zk-proof`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({
+          proof: proofData.proof,
+          publicSignals: [
+            proofData.publicInputs.threshold,
+            proofData.publicInputs.commitment,
+          ],
+        }),
+      }
+    )
+
+    const zkResult = await zkVerifyResponse.json()
+    const isValidProof = zkResult.verified
+
+    console.log('ZK proof verification result:', isValidProof ? 'VALID' : 'INVALID')
 
     if (!isValidProof) {
       return new Response(

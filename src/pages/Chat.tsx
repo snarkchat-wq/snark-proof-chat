@@ -92,10 +92,21 @@ const Chat = () => {
     setShowProofAnimation(true);
     
     try {
-      // Generate mock proof data (in production, this would use gnark WASM)
+      // Generate REAL ZK proof
+      const { generateTokenBalanceProof } = await import('@/lib/zkProof');
+      
+      toast({
+        title: "Generating ZK Proof",
+        description: "This may take 3-5 seconds...",
+      });
+      
+      const zkProof = await generateTokenBalanceProof(publicKey.toString());
+      
       const proofData = {
-        proof: "0x" + Math.random().toString(36).substring(2, 15) + "...",
+        proof: zkProof.proof,
         publicInputs: {
+          threshold: zkProof.publicSignals[0],
+          commitment: zkProof.publicSignals[1],
           timestamp: Date.now(),
           walletAddress: publicKey,
         },

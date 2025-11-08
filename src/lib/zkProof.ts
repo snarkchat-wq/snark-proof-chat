@@ -1,0 +1,148 @@
+import { getTokenRequirements, getSPLTokenBalance } from './tokenGating';
+
+// SnarkJS will be loaded dynamically
+let snarkjs: any = null;
+
+export async function loadSnarkJS() {
+  if (!snarkjs) {
+    // @ts-ignore - Dynamic import for large library
+    snarkjs = await import('snarkjs');
+  }
+  return snarkjs;
+}
+
+export interface ZKProofData {
+  proof: {
+    pi_a: string[];
+    pi_b: string[][];
+    pi_c: string[];
+    protocol: string;
+    curve: string;
+  };
+  publicSignals: string[];
+}
+
+/**
+ * Generate a ZK proof that the wallet holds sufficient tokens
+ * without revealing the exact balance
+ */
+export async function generateTokenBalanceProof(
+  walletAddress: string
+): Promise<ZKProofData> {
+  console.log('🔐 Generating ZK proof for token balance...');
+  
+  try {
+    // Load SnarkJS library
+    const snarkjs = await loadSnarkJS();
+    
+    // Get token requirements
+    const requirements = await getTokenRequirements();
+    if (!requirements) {
+      throw new Error('Token requirements not configured');
+    }
+    
+    // Get actual token balance
+    const actualBalance = await getSPLTokenBalance(
+      walletAddress,
+      requirements.token_mint_address
+    );
+    
+    console.log(`Balance: ${actualBalance}, Required: ${requirements.threshold_amount}`);
+    
+    if (actualBalance < requirements.threshold_amount) {
+      throw new Error(`Insufficient balance: ${actualBalance} < ${requirements.threshold_amount}`);
+    }
+    
+    // Generate random salt for commitment
+    const salt = BigInt('0x' + Array.from(crypto.getRandomValues(new Uint8Array(32)))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join(''));
+    
+    // Convert balance to integer (handling decimals)
+    const balanceInt = Math.floor(actualBalance);
+    
+    // Calculate commitment: Poseidon(balance, salt)
+    // Note: This would normally use the Poseidon hash from circomlibjs
+    // For now, we'll compute it using the circuit itself
+    // @ts-ignore - Dynamic import
+    const circomlibjs = await import('circomlibjs');
+    const commitment = circomlibjs.poseidon([BigInt(balanceInt), salt]);
+    
+    // Prepare circuit inputs
+    const input = {
+      actualBalance: balanceInt.toString(),
+      salt: salt.toString(),
+      threshold: requirements.threshold_amount.toString(),
+      commitment: commitment.toString(),
+    };
+    
+    console.log('📝 Prepared circuit inputs (private data hidden)');
+    
+    // Load circuit files
+    const wasmPath = '/zkp/tokenBalance.wasm';
+    const zkeyPath = '/zkp/tokenBalance_final.zkey';
+    
+    console.log('⚙️  Generating witness...');
+    
+    // Generate witness
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+      input,
+      wasmPath,
+      zkeyPath
+    );
+    
+    console.log('✅ ZK Proof generated successfully!');
+    console.log('Public signals:', publicSignals);
+    
+    return {
+      proof,
+      publicSignals,
+    };
+    
+  } catch (error) {
+    console.error('❌ Error generating ZK proof:', error);
+    throw new Error(`ZK proof generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Verify a ZK proof (client-side verification)
+ * Backend should also verify!
+ */
+export async function verifyTokenBalanceProof(
+  proofData: ZKProofData
+): Promise<boolean> {
+  try {
+    const snarkjs = await loadSnarkJS();
+    
+    // Load verification key
+    const vkeyResponse = await fetch('/zkp/verification_key.json');
+    const vkey = await vkeyResponse.json();
+    
+    // Verify proof
+    const verified = await snarkjs.groth16.verify(
+      vkey,
+      proofData.publicSignals,
+      proofData.proof
+    );
+    
+    return verified;
+  } catch (error) {
+    console.error('Error verifying proof:', error);
+    return false;
+  }
+}
+
+/**
+ * Format proof data for display
+ */
+export function formatProofForDisplay(proofData: ZKProofData): string {
+  return JSON.stringify({
+    proof: {
+      pi_a: proofData.proof.pi_a.map(v => v.substring(0, 20) + '...'),
+      pi_b: proofData.proof.pi_b.map(arr => arr.map(v => v.substring(0, 20) + '...')),
+      pi_c: proofData.proof.pi_c.map(v => v.substring(0, 20) + '...'),
+    },
+    publicSignals: proofData.publicSignals,
+  }, null, 2);
+}
