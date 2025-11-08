@@ -134,11 +134,6 @@ const Index = () => {
                       [HOW IT WORKS]
                     </Button>
                   </Link>
-                  <Link to="/on-chain" className="flex-1">
-                    <Button variant="outline" size="lg" className="w-full border-accent text-accent">
-                      [ON-CHAIN]
-                    </Button>
-                  </Link>
                   {isUserAdmin && (
                     <Link to="/admin" className="flex-1">
                       <Button variant="outline" size="lg" className="w-full border-accent text-accent">
