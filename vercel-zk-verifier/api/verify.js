@@ -3,6 +3,7 @@ const snarkjs = require('snarkjs');
 /**
  * Vercel Serverless Function for ZK-SNARK Proof Verification
  * Supports Groth16 proofs with full cryptographic verification
+ * Health: no-op change to trigger deploy
  */
 module.exports = async (req, res) => {
   // Enable CORS for Supabase edge functions
