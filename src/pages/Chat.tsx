@@ -226,54 +226,67 @@ const Chat = () => {
               <span className="text-accent">&gt;</span> No messages yet. Be the first to send one!
             </div>
           ) : (
-            messages.map((msg) => (
-              <div key={msg.id} className="border border-primary/50 p-3 bg-background/50">
-                <div className="flex items-start justify-between mb-2">
-                  <span className="text-primary">
-                    [{formatTime(msg.created_at)}] &lt;{formatWalletAddress(msg.wallet_address)}&gt;
-                  </span>
-                  <span className={msg.verified ? "text-primary" : "text-destructive"}>
-                    {msg.verified ? "✅ verified" : "❌ failed"}
-                  </span>
-                </div>
-                <div className="text-foreground mb-2">{msg.decryptedContent}</div>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <div>Proof: {msg.proof_data.proof}</div>
-                  {msg.blockchain_tx_hash && (
-                    <div className="text-accent">
-                      ⛓️ Blockchain: 
-                      <a 
-                        href={`https://explorer.solana.com/tx/${msg.blockchain_tx_hash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline ml-1"
+            messages.map((msg) => {
+              try {
+                return (
+                  <div key={msg.id} className="border border-primary/50 p-3 bg-background/50">
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="text-primary">
+                        [{formatTime(msg.created_at)}] &lt;{formatWalletAddress(msg.wallet_address)}&gt;
+                      </span>
+                      <span className={msg.verified ? "text-primary" : "text-destructive"}>
+                        {msg.verified ? "✅ verified" : "❌ failed"}
+                      </span>
+                    </div>
+                    <div className="text-foreground mb-2">{msg.decryptedContent}</div>
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <div>Proof: {msg.proof_data?.proof ? '✅ Generated' : 'N/A'}</div>
+                      {msg.blockchain_tx_hash && (
+                        <div className="text-accent">
+                          ⛓️ Blockchain: 
+                          <a 
+                            href={`https://explorer.solana.com/tx/${msg.blockchain_tx_hash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline ml-1"
+                          >
+                            {msg.blockchain_tx_hash.substring(0, 16)}...
+                          </a>
+                        </div>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-accent hover:text-accent h-auto p-0 text-xs"
+                        onClick={() => setSelectedProof(selectedProof === msg.id ? null : msg.id)}
                       >
-                        {msg.blockchain_tx_hash.substring(0, 16)}...
-                      </a>
+                        [{selectedProof === msg.id ? "Hide" : "Show"} Proof Details]
+                      </Button>
+                      {selectedProof === msg.id && (
+                        <div className="mt-2">
+                          <ProofDetails 
+                            proofData={msg.proof_data}
+                            verified={msg.verified}
+                            timestamp={msg.created_at}
+                            walletAddress={msg.wallet_address}
+                            blockchainTxHash={msg.blockchain_tx_hash}
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-accent hover:text-accent h-auto p-0 text-xs"
-                    onClick={() => setSelectedProof(selectedProof === msg.id ? null : msg.id)}
-                  >
-                    [{selectedProof === msg.id ? "Hide" : "Show"} Proof Details]
-                  </Button>
-                  {selectedProof === msg.id && (
-                    <div className="mt-2">
-                      <ProofDetails 
-                        proofData={msg.proof_data}
-                        verified={msg.verified}
-                        timestamp={msg.created_at}
-                        walletAddress={msg.wallet_address}
-                        blockchainTxHash={msg.blockchain_tx_hash}
-                      />
+                  </div>
+                );
+              } catch (error) {
+                console.error('Error rendering message:', msg.id, error);
+                return (
+                  <div key={msg.id} className="border border-destructive/50 p-3 bg-background/50">
+                    <div className="text-destructive text-xs">
+                      ⚠️ Error displaying message
                     </div>
-                  )}
-                </div>
-              </div>
-            ))
+                  </div>
+                );
+              }
+            })
           )}
 
           {showProofAnimation && (
