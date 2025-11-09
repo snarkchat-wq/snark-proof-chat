@@ -161,19 +161,20 @@ export const useRealtimeMessages = () => {
       }
 
       // 4. Log to Solana blockchain
-      const raw = response.data ?? {} as any;
-      const messageId = (raw as any)?.message?.id ?? (raw as any)?.id ?? (raw as any)?.messageId ?? (raw as any)?.message?.message_id;
-      if (messageId) {
-        toast({
-          title: 'Step 2/2: Approve blockchain transaction',
-          description: 'Phantom will now open a mainnet transaction for approval.',
-        });
-        console.log('📝 Creating Solana transaction...');
-        const messageHash = generateMessageHash(plainTextMessage);
-        // Ensure unique memo per message to guarantee unique tx signatures
-        const memoText = `SNARK:${messageHash}:${messageId}:${Date.now()}`;
-        
-        try {
+      const raw = response.data as any;
+      const messageId: string | undefined = raw?.message?.id;
+
+      // Build memo text regardless, so we can still attempt TX even if ID missing
+      const messageHash = generateMessageHash(plainTextMessage);
+      const memoText = `SNARK:${messageHash}:${messageId ?? 'noid'}:${Date.now()}`;
+
+      toast({
+        title: 'Step 2/2: Approve blockchain transaction',
+        description: 'Phantom will now open a mainnet transaction for approval.',
+      });
+      console.log('📝 Creating Solana transaction...', { messageId, memoText });
+      
+      try {
           // Check SOL balance before attempting transaction
           const { Connection } = await import('@solana/web3.js');
           const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
@@ -192,14 +193,14 @@ export const useRealtimeMessages = () => {
 
           // Optimistically update local state immediately
           setMessages((current) => {
-            const exists = current.some((m) => m.id === messageId);
-            if (exists) {
+            const exists = messageId ? current.some((m) => m.id === messageId) : false;
+            if (exists && messageId) {
               return current.map((m) =>
                 m.id === messageId ? { ...m, blockchain_tx_hash: txSignature } : m
               );
             } else {
-              // Store pending tx to merge when the INSERT arrives
-              pendingTxRef.current[messageId] = txSignature;
+              // Store pending tx to merge when the INSERT arrives (only if we have an id)
+              if (messageId) pendingTxRef.current[messageId] = txSignature;
               return current;
             }
           });
@@ -258,13 +259,6 @@ export const useRealtimeMessages = () => {
             throw new Error('Message saved but blockchain logging failed: ' + errorMsg);
           }
         }
-      } else {
-        toast({
-          title: 'Could not start on-chain logging',
-          description: 'No message ID returned from backend; cannot create transaction.',
-          variant: 'destructive',
-        });
-      }
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;
