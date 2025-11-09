@@ -258,9 +258,13 @@ export const useRealtimeMessages = () => {
             throw new Error('Message saved but blockchain logging failed: ' + errorMsg);
           }
         }
+      } else {
+        toast({
+          title: 'Could not start on-chain logging',
+          description: 'No message ID returned from backend; cannot create transaction.',
+          variant: 'destructive',
+        });
       }
-
-      return response.data;
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;

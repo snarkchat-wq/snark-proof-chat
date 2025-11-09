@@ -48,7 +48,20 @@ export async function signAndSendTransaction(
   }
 
   try {
-    // Prefer native signAndSendTransaction when available (Phantom modern API)
+    // Prefer legacy signTransaction for broad Phantom compatibility with non-versioned Transaction
+    if (typeof (wallet as any).signTransaction === 'function') {
+      const signed = await (wallet as any).signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+      });
+      console.log('Transaction sent:', signature);
+      await connection.confirmTransaction(signature, 'confirmed');
+      console.log('Transaction confirmed:', signature);
+      return signature;
+    }
+
+    // Fallback: native signAndSendTransaction (expects VersionedTransaction in some wallets)
     if (typeof (wallet as any).signAndSendTransaction === 'function') {
       const res = await (wallet as any).signAndSendTransaction(transaction, {
         skipPreflight: false,
@@ -56,24 +69,13 @@ export async function signAndSendTransaction(
       });
       const sig: string = typeof res === 'string' ? res : res?.signature;
       if (!sig) throw new Error('No signature returned by wallet');
-
       console.log('Transaction sent:', sig);
       await connection.confirmTransaction(sig, 'confirmed');
       console.log('Transaction confirmed:', sig);
       return sig;
     }
 
-    // Fallback: sign locally then send
-    const signed = await (wallet as any).signTransaction(transaction);
-    const signature = await connection.sendRawTransaction(signed.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'confirmed',
-    });
-
-    console.log('Transaction sent:', signature);
-    await connection.confirmTransaction(signature, 'confirmed');
-    console.log('Transaction confirmed:', signature);
-    return signature;
+    throw new Error('Wallet does not support transaction signing');
   } catch (error) {
     console.error('Error signing/sending transaction:', error);
     throw error;
