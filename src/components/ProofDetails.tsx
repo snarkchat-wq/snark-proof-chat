@@ -130,10 +130,10 @@ const ProofDetails = ({
       </div>
 
       {/* Blockchain Transaction */}
-      {blockchainTxHash && (
-        <div className="space-y-1">
-          <span className="text-muted-foreground">Blockchain TX:</span>
-          <div className="bg-card p-2">
+      <div className="space-y-1">
+        <span className="text-muted-foreground">Blockchain TX:</span>
+        <div className="bg-card p-2">
+          {blockchainTxHash ? (
             <a 
               href={`https://explorer.solana.com/tx/${blockchainTxHash}`}
               target="_blank"
@@ -142,9 +142,11 @@ const ProofDetails = ({
             >
               {blockchainTxHash}
             </a>
-          </div>
+          ) : (
+            <span className="text-muted-foreground">Not logged yet</span>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Technical Info */}
       <div className="border-t border-accent/30 pt-2 space-y-1">
