@@ -173,6 +173,13 @@ export const useRealtimeMessages = () => {
           
           console.log('✅ Message logged to Solana Mainnet:', txSignature);
           console.log('🔗 View transaction:', `https://explorer.solana.com/tx/${txSignature}`);
+
+          // Optimistically update local state so UI shows the link immediately
+          setMessages((current) =>
+            current.map((m) =>
+              m.id === response.data.message.id ? { ...m, blockchain_tx_hash: txSignature } : m
+            )
+          );
         } catch (solanaError) {
           console.error('❌ Solana logging failed (message still saved):', solanaError);
           const errorMsg = solanaError instanceof Error ? solanaError.message : String(solanaError);
