@@ -193,7 +193,14 @@ export const useRealtimeMessages = () => {
             }
           });
           
-          console.log('⛓️ Logging transaction to backend...');
+          console.log('✅ Transaction confirmed on Solana:', txSignature);
+          console.log('🔗 View transaction:', `https://explorer.solana.com/tx/${txSignature}`);
+          
+          // Wait 2 seconds for transaction to fully propagate on Solana before verifying
+          console.log('⏳ Waiting for transaction to propagate on Solana network...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          console.log('⛓️ Logging transaction to backend for verification...');
           const logResponse = await supabase.functions.invoke('log-to-solana', {
             body: {
               messageId,
@@ -204,11 +211,10 @@ export const useRealtimeMessages = () => {
           
           if (logResponse.error) {
             console.error('❌ Backend logging failed:', logResponse.error);
-            // Keep optimistic UI; backend will retry or user can refresh
+            console.error('Full error:', JSON.stringify(logResponse.error, null, 2));
+          } else {
+            console.log('✅ Backend verification complete:', logResponse.data);
           }
-          
-          console.log('✅ Message logged to Solana Mainnet:', txSignature);
-          console.log('🔗 View transaction:', `https://explorer.solana.com/tx/${txSignature}`);
         } catch (solanaError) {
           console.error('❌ Solana logging failed (message still saved):', solanaError);
           const errorMsg = solanaError instanceof Error ? solanaError.message : String(solanaError);
