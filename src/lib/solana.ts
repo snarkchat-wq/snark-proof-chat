@@ -48,20 +48,30 @@ export async function signAndSendTransaction(
   }
 
   try {
-    // Sign transaction with Phantom
-    const signed = await wallet.signTransaction(transaction);
+    // Prefer native signAndSendTransaction when available (Phantom modern API)
+    if (typeof (wallet as any).signAndSendTransaction === 'function') {
+      const res = await (wallet as any).signAndSendTransaction(transaction, {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+      });
+      const sig: string = typeof res === 'string' ? res : res?.signature;
+      if (!sig) throw new Error('No signature returned by wallet');
 
-    // Send transaction
+      console.log('Transaction sent:', sig);
+      await connection.confirmTransaction(sig, 'confirmed');
+      console.log('Transaction confirmed:', sig);
+      return sig;
+    }
+
+    // Fallback: sign locally then send
+    const signed = await (wallet as any).signTransaction(transaction);
     const signature = await connection.sendRawTransaction(signed.serialize(), {
       skipPreflight: false,
       preflightCommitment: 'confirmed',
     });
 
     console.log('Transaction sent:', signature);
-
-    // Wait for confirmation
     await connection.confirmTransaction(signature, 'confirmed');
-
     console.log('Transaction confirmed:', signature);
     return signature;
   } catch (error) {

@@ -248,9 +248,12 @@ export const useRealtimeMessages = () => {
         } catch (solanaError) {
           console.error('❌ Solana logging failed (message still saved):', solanaError);
           const errorMsg = solanaError instanceof Error ? solanaError.message : String(solanaError);
-          console.error('📋 Error details:', errorMsg);
-          // Don't throw - message was saved successfully even if blockchain logging failed
-          // But notify user about the blockchain logging failure
+          // Notify user of blockchain logging failure
+          toast({
+            title: 'Blockchain logging failed',
+            description: errorMsg.includes('User rejected') ? 'Transaction was rejected in wallet.' : errorMsg,
+            variant: 'destructive',
+          });
           if (errorMsg.includes('Insufficient SOL')) {
             throw new Error('Message saved but blockchain logging failed: ' + errorMsg);
           }
