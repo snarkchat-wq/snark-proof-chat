@@ -136,17 +136,29 @@ export const useRealtimeMessages = () => {
 
       // 4. Log to Solana blockchain
       if (response.data?.message?.id) {
-        console.log('Creating Solana transaction...');
+        console.log('📝 Creating Solana transaction...');
         const messageHash = generateMessageHash(plainTextMessage);
         const memoText = `SNARK:${messageHash}`;
         
         try {
+          // Check SOL balance before attempting transaction
+          const { Connection } = await import('@solana/web3.js');
+          const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+          const balance = await connection.getBalance(wallet.publicKey);
+          const solBalance = balance / 1e9; // Convert lamports to SOL
+          
+          console.log(`💰 Wallet SOL balance: ${solBalance.toFixed(4)} SOL`);
+          
+          if (solBalance < 0.00001) {
+            throw new Error(`Insufficient SOL for gas fees. Balance: ${solBalance.toFixed(6)} SOL. Please add at least 0.001 SOL to your wallet.`);
+          }
+          
           const { transaction } = await createMemoTransaction(wallet, memoText);
-          console.log('Signing and sending transaction...');
+          console.log('✍️ Signing and sending transaction...');
           const txSignature = await signAndSendTransaction(wallet, transaction);
           
-          console.log('Logging transaction to backend...');
-          await supabase.functions.invoke('log-to-solana', {
+          console.log('⛓️ Logging transaction to backend...');
+          const logResponse = await supabase.functions.invoke('log-to-solana', {
             body: {
               messageId: response.data.message.id,
               messageHash,
@@ -154,10 +166,22 @@ export const useRealtimeMessages = () => {
             },
           });
           
-          console.log('✅ Message logged to Solana:', txSignature);
+          if (logResponse.error) {
+            console.error('❌ Backend logging failed:', logResponse.error);
+            throw logResponse.error;
+          }
+          
+          console.log('✅ Message logged to Solana Mainnet:', txSignature);
+          console.log('🔗 View transaction:', `https://explorer.solana.com/tx/${txSignature}`);
         } catch (solanaError) {
-          console.error('Solana logging failed (message still saved):', solanaError);
+          console.error('❌ Solana logging failed (message still saved):', solanaError);
+          const errorMsg = solanaError instanceof Error ? solanaError.message : String(solanaError);
+          console.error('📋 Error details:', errorMsg);
           // Don't throw - message was saved successfully even if blockchain logging failed
+          // But notify user about the blockchain logging failure
+          if (errorMsg.includes('Insufficient SOL')) {
+            throw new Error('Message saved but blockchain logging failed: ' + errorMsg);
+          }
         }
       }
 
