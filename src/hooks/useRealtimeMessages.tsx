@@ -161,7 +161,8 @@ export const useRealtimeMessages = () => {
       if (messageId) {
         console.log('📝 Creating Solana transaction...');
         const messageHash = generateMessageHash(plainTextMessage);
-        const memoText = `SNARK:${messageHash}`;
+        // Ensure unique memo per message to guarantee unique tx signatures
+        const memoText = `SNARK:${messageHash}:${messageId}:${Date.now()}`;
         
         try {
           // Check SOL balance before attempting transaction
