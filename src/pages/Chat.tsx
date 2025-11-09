@@ -123,6 +123,10 @@ const Chat = () => {
       
       const zkProof = await generateTokenBalanceProof(publicKey.toString());
       
+      console.log('🔍 ZK Proof publicSignals from circuit:', zkProof.publicSignals);
+      console.log('📊 publicSignals[0] (threshold):', zkProof.publicSignals[0]);
+      console.log('📊 publicSignals[1] (commitment):', zkProof.publicSignals[1]);
+      
       const proofData = {
         proof: zkProof.proof,
         publicInputs: {
@@ -132,6 +136,8 @@ const Chat = () => {
           walletAddress: publicKey,
         },
       };
+      
+      console.log('📦 Final proofData being sent:', proofData);
 
       // Show blockchain animation
       setTimeout(() => {
