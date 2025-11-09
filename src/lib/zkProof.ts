@@ -121,10 +121,14 @@ export async function generateTokenBalanceProof(
     console.log('✅ ZK Proof generated successfully!');
     console.log('Public signals:', publicSignals);
     
-    return {
+    return Object.assign({
       proof,
       publicSignals,
-    };
+    }, {
+      // Provide derived values for UI/display correctness
+      computedCommitment: commitment,
+      requiredThreshold: requiredThreshold.toString(),
+    });
     
   } catch (error) {
     console.error('❌ Error generating ZK proof:', error);

@@ -123,15 +123,18 @@ const Chat = () => {
       
       const zkProof = await generateTokenBalanceProof(publicKey.toString());
       
+      const derivedThreshold = (zkProof as any)?.requiredThreshold ?? zkProof.publicSignals?.[0];
+      const derivedCommitment = (zkProof as any)?.computedCommitment ?? zkProof.publicSignals?.[1];
+      
       console.log('🔍 ZK Proof publicSignals from circuit:', zkProof.publicSignals);
-      console.log('📊 publicSignals[0] (threshold):', zkProof.publicSignals[0]);
-      console.log('📊 publicSignals[1] (commitment):', zkProof.publicSignals[1]);
+      console.log('📊 derived threshold:', derivedThreshold);
+      console.log('📊 derived commitment:', derivedCommitment);
       
       const proofData = {
         proof: zkProof.proof,
         publicInputs: {
-          threshold: zkProof.publicSignals[0],
-          commitment: zkProof.publicSignals[1],
+          threshold: String(derivedThreshold),
+          commitment: String(derivedCommitment),
           timestamp: Date.now(),
           walletAddress: publicKey,
         },
@@ -247,6 +250,11 @@ const Chat = () => {
                     <div className="text-foreground mb-2">{msg.decryptedContent}</div>
                     <div className="text-xs text-muted-foreground space-y-1">
                       <div>Proof: {msg.proof_data?.proof ? '✅ Generated' : 'N/A'}</div>
+                      {msg.proof_data?.publicInputs?.commitment && (
+                        <div className="text-muted-foreground">
+                          Commitment: {String(msg.proof_data.publicInputs.commitment).slice(0, 18)}...
+                        </div>
+                      )}
                       {msg.blockchain_tx_hash && (
                         <div className="text-accent">
                           ⛓️ Blockchain: 

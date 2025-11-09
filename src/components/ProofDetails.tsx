@@ -112,6 +112,12 @@ const ProofDetails = ({
               </span>
             </div>
           ))}
+          {/* Hint when commitment equals a small constant like 10000 */}
+          {String((proofData as any)?.publicInputs?.commitment) === '10000' && (
+            <div className="text-[10px] text-muted-foreground mt-1">
+              Note: This circuit build exposes [valid, threshold] as public signals. Commitment shown here is derived client-side and should be unique per message.
+            </div>
+          )}
         </div>
       </div>
 

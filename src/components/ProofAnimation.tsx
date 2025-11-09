@@ -23,7 +23,7 @@ const ProofAnimation = ({ type, onComplete }: ProofAnimationProps) => {
     ],
     blockchain: [
       { text: "> preparing transaction...", progress: 25 },
-      { text: "> sending to Solana Devnet...", progress: 85 },
+      { text: "> sending to Solana Mainnet...", progress: 85 },
       { text: "> transaction confirmed ✅", progress: 100 },
       { text: "> hash: 5H3fT9k9AB2c8Fd...", progress: 100 },
     ],
