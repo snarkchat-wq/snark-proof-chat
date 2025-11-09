@@ -71,7 +71,10 @@ export async function signAndSendTransaction(
 }
 
 export function getExplorerUrl(signature: string, network: 'devnet' | 'mainnet' = 'mainnet'): string {
-  return `https://explorer.solana.com/tx/${signature}?cluster=${network}`;
+  // Mainnet doesn't need cluster parameter, devnet does
+  return network === 'mainnet' 
+    ? `https://explorer.solana.com/tx/${signature}`
+    : `https://explorer.solana.com/tx/${signature}?cluster=${network}`;
 }
 
 export async function verifySignature(
