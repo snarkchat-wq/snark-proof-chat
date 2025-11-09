@@ -202,19 +202,38 @@ export const useRealtimeMessages = () => {
           await new Promise(resolve => setTimeout(resolve, 2000));
           
           console.log('⛓️ Logging transaction to backend for verification...');
-          const logResponse = await supabase.functions.invoke('log-to-solana', {
-            body: {
-              messageId,
-              messageHash,
-              transactionSignature: txSignature,
-            },
-          });
-          
-          if (logResponse.error) {
-            console.error('❌ Backend logging failed:', logResponse.error);
-            console.error('Full error:', JSON.stringify(logResponse.error, null, 2));
-          } else {
-            console.log('✅ Backend verification complete:', logResponse.data);
+          let logOk = false;
+          try {
+            const logResponse = await supabase.functions.invoke('log-to-solana', {
+              body: {
+                messageId,
+                messageHash,
+                transactionSignature: txSignature,
+              },
+            });
+            if (logResponse.error) throw logResponse.error;
+            logOk = true;
+            console.log('✅ Backend verification complete (invoke):', logResponse.data);
+          } catch (e1) {
+            console.warn('⚠️ invoke failed, trying direct fetch fallback...', e1);
+            try {
+              const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/log-to-solana`;
+              const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                },
+                body: JSON.stringify({ messageId, messageHash, transactionSignature: txSignature }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(JSON.stringify(data));
+              logOk = true;
+              console.log('✅ Backend verification complete (fetch):', data);
+            } catch (e2) {
+              console.error('❌ Backend logging failed (both methods):', e2);
+            }
           }
         } catch (solanaError) {
           console.error('❌ Solana logging failed (message still saved):', solanaError);
