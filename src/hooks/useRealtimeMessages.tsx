@@ -156,7 +156,9 @@ export const useRealtimeMessages = () => {
       }
 
       // 4. Log to Solana blockchain
-      if (response.data?.message?.id) {
+      const raw = response.data ?? {} as any;
+      const messageId = (raw as any)?.message?.id ?? (raw as any)?.id ?? (raw as any)?.messageId ?? (raw as any)?.message?.message_id;
+      if (messageId) {
         console.log('📝 Creating Solana transaction...');
         const messageHash = generateMessageHash(plainTextMessage);
         const memoText = `SNARK:${messageHash}`;
@@ -179,7 +181,6 @@ export const useRealtimeMessages = () => {
           const txSignature = await signAndSendTransaction(wallet, transaction);
 
           // Optimistically update local state immediately
-          const messageId = response.data.message.id as string;
           setMessages((current) => {
             const exists = current.some((m) => m.id === messageId);
             if (exists) {
