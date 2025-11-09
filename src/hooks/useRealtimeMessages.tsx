@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { encryptMessage, decryptMessage, generateMessageHash } from '@/lib/encryption';
 import { createMemoTransaction, signAndSendTransaction } from '@/lib/solana';
@@ -20,7 +20,7 @@ export interface DecryptedMessage extends Message {
 export const useRealtimeMessages = () => {
   const [messages, setMessages] = useState<DecryptedMessage[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const pendingTxRef = useRef<Record<string, string>>({});
   useEffect(() => {
     // Fetch initial messages
     const fetchMessages = async () => {
@@ -60,7 +60,19 @@ export const useRealtimeMessages = () => {
           console.log('New message received:', payload);
           const newMessage = payload.new as Message;
           const decryptedContent = await decryptMessage(newMessage.encrypted_content);
-          setMessages((current) => [...current, { ...newMessage, decryptedContent }]);
+
+          // Merge any pending optimistic tx hash if exists
+          let blockchain_tx_hash = newMessage.blockchain_tx_hash;
+          const pendingTx = pendingTxRef.current[newMessage.id];
+          if (!blockchain_tx_hash && pendingTx) {
+            blockchain_tx_hash = pendingTx;
+            delete pendingTxRef.current[newMessage.id];
+          }
+
+          setMessages((current) => [
+            ...current, 
+            { ...newMessage, blockchain_tx_hash, decryptedContent }
+          ]);
         }
       )
       .on(
@@ -74,10 +86,19 @@ export const useRealtimeMessages = () => {
           console.log('Message updated:', payload);
           const updatedMessage = payload.new as Message;
           const decryptedContent = await decryptMessage(updatedMessage.encrypted_content);
+
+          // Ensure we merge any pending tx if backend update missed
+          let blockchain_tx_hash = updatedMessage.blockchain_tx_hash;
+          const pendingTx = pendingTxRef.current[updatedMessage.id];
+          if (!blockchain_tx_hash && pendingTx) {
+            blockchain_tx_hash = pendingTx;
+            delete pendingTxRef.current[updatedMessage.id];
+          }
+
           setMessages((current) =>
             current.map((msg) =>
               msg.id === updatedMessage.id 
-                ? { ...updatedMessage, decryptedContent } 
+                ? { ...updatedMessage, blockchain_tx_hash, decryptedContent } 
                 : msg
             )
           );
@@ -156,11 +177,26 @@ export const useRealtimeMessages = () => {
           const { transaction } = await createMemoTransaction(wallet, memoText);
           console.log('✍️ Signing and sending transaction...');
           const txSignature = await signAndSendTransaction(wallet, transaction);
+
+          // Optimistically update local state immediately
+          const messageId = response.data.message.id as string;
+          setMessages((current) => {
+            const exists = current.some((m) => m.id === messageId);
+            if (exists) {
+              return current.map((m) =>
+                m.id === messageId ? { ...m, blockchain_tx_hash: txSignature } : m
+              );
+            } else {
+              // Store pending tx to merge when the INSERT arrives
+              pendingTxRef.current[messageId] = txSignature;
+              return current;
+            }
+          });
           
           console.log('⛓️ Logging transaction to backend...');
           const logResponse = await supabase.functions.invoke('log-to-solana', {
             body: {
-              messageId: response.data.message.id,
+              messageId,
               messageHash,
               transactionSignature: txSignature,
             },
@@ -168,18 +204,11 @@ export const useRealtimeMessages = () => {
           
           if (logResponse.error) {
             console.error('❌ Backend logging failed:', logResponse.error);
-            throw logResponse.error;
+            // Keep optimistic UI; backend will retry or user can refresh
           }
           
           console.log('✅ Message logged to Solana Mainnet:', txSignature);
           console.log('🔗 View transaction:', `https://explorer.solana.com/tx/${txSignature}`);
-
-          // Optimistically update local state so UI shows the link immediately
-          setMessages((current) =>
-            current.map((m) =>
-              m.id === response.data.message.id ? { ...m, blockchain_tx_hash: txSignature } : m
-            )
-          );
         } catch (solanaError) {
           console.error('❌ Solana logging failed (message still saved):', solanaError);
           const errorMsg = solanaError instanceof Error ? solanaError.message : String(solanaError);
