@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { encryptMessage, decryptMessage, generateMessageHash } from '@/lib/encryption';
 import { createMemoTransaction, signAndSendTransaction } from '@/lib/solana';
+import { toast } from '@/components/ui/use-toast';
 
 interface Message {
   id: string;
@@ -129,11 +130,15 @@ export const useRealtimeMessages = () => {
       
       // 2. Create signature for authentication
       console.log('Creating signature...');
+      toast({
+        title: 'Step 1/2: Sign to authenticate',
+        description: "Phantom will show a 'Sign Message' prompt.",
+      });
       const timestamp = Date.now();
       const authMessage = `SNARK:${walletAddress}:${timestamp}`;
       const encodedMessage = new TextEncoder().encode(authMessage);
       const signatureObj = await (wallet as any).signMessage(encodedMessage, 'utf8');
-      
+
       // Convert signature to hex string
       const signature = Array.from(signatureObj.signature)
         .map((b: number) => b.toString(16).padStart(2, '0'))
@@ -159,6 +164,10 @@ export const useRealtimeMessages = () => {
       const raw = response.data ?? {} as any;
       const messageId = (raw as any)?.message?.id ?? (raw as any)?.id ?? (raw as any)?.messageId ?? (raw as any)?.message?.message_id;
       if (messageId) {
+        toast({
+          title: 'Step 2/2: Approve blockchain transaction',
+          description: 'Phantom will now open a mainnet transaction for approval.',
+        });
         console.log('📝 Creating Solana transaction...');
         const messageHash = generateMessageHash(plainTextMessage);
         // Ensure unique memo per message to guarantee unique tx signatures
