@@ -77,6 +77,9 @@ const ProofDetails = ({
                 pi_a: [{(proofData.proof as any)?.pi_a?.slice(0, 2).join(', ')}...]
               </div>
               <div className="text-[10px] text-muted-foreground break-all">
+                pi_b: [[{(proofData.proof as any)?.pi_b?.[0]?.slice(0, 2).join(', ')}...], [{(proofData.proof as any)?.pi_b?.[1]?.slice(0, 2).join(', ')}...]]
+              </div>
+              <div className="text-[10px] text-muted-foreground break-all">
                 pi_c: [{(proofData.proof as any)?.pi_c?.slice(0, 2).join(', ')}...]
               </div>
               <button 
