@@ -139,16 +139,25 @@ export const useRealtimeMessages = () => {
       });
       console.log('📝 Creating Solana transaction...', { memoText });
       
-      // Check SOL balance before attempting transaction
-      const { Connection } = await import('@solana/web3.js');
-      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-      const balance = await connection.getBalance(wallet.publicKey);
-      const solBalance = balance / 1e9;
-      
-      console.log(`💰 Wallet SOL balance: ${solBalance.toFixed(4)} SOL`);
-      
-      if (solBalance < 0.00001) {
-        throw new Error(`Insufficient SOL for gas fees. Balance: ${solBalance.toFixed(6)} SOL. Please add at least 0.001 SOL to your wallet.`);
+      // Try to check SOL balance, but don't block if RPC is rate-limited
+      try {
+        const { Connection } = await import('@solana/web3.js');
+        const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+        const balance = await connection.getBalance(wallet.publicKey);
+        const solBalance = balance / 1e9;
+        
+        console.log(`💰 Wallet SOL balance: ${solBalance.toFixed(4)} SOL`);
+        
+        if (solBalance < 0.00001) {
+          toast({
+            title: 'Low SOL Balance',
+            description: `Your balance is ${solBalance.toFixed(6)} SOL. Transaction may fail due to insufficient gas fees.`,
+            variant: 'destructive',
+          });
+        }
+      } catch (balanceError) {
+        console.warn('⚠️ Could not check balance (RPC may be rate-limited):', balanceError);
+        // Continue anyway - wallet will show error if insufficient funds
       }
       
       console.log('🔨 Creating transaction...');
