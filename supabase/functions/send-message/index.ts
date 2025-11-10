@@ -134,6 +134,21 @@ Deno.serve(async (req) => {
     // Verify zero-knowledge proof using Supabase function invoke
     console.log('Verifying ZK proof...')
     
+    // Fetch verification key from storage
+    const { data: vkeyData } = await supabase.storage
+      .from('zkp')
+      .download('verification_key.json')
+    
+    let vkey = null
+    if (vkeyData) {
+      const vkeyText = await vkeyData.text()
+      vkey = JSON.parse(vkeyText)
+      console.log('✅ Loaded verification key from storage')
+    }
+    
+    // Get Vercel verifier URL from environment
+    const verifierUrl = Deno.env.get('VERCEL_ZK_VERIFIER_URL')
+    
     const { data: zkResult, error: zkError } = await supabase.functions.invoke(
       'verify-zk-proof',
       {
@@ -143,6 +158,8 @@ Deno.serve(async (req) => {
             proofData.publicInputs.threshold,
             proofData.publicInputs.commitment,
           ],
+          vkey: vkey,
+          verifierUrl: verifierUrl,
         },
       }
     )
