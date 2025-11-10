@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import nacl from 'https://esm.sh/tweetnacl@1.0.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,9 +11,10 @@ interface MessageRequest {
   proofData: {
     proof: string
     publicInputs: any
-    publicSignals?: string[]  // Add optional publicSignals array
+    publicSignals?: string[]
   }
-  signature: string
+  transactionSignature: string
+  messageHash: string
   timestamp: number
 }
 
@@ -30,35 +30,39 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { walletAddress, encryptedContent, proofData, signature, timestamp }: MessageRequest = await req.json()
+    const { walletAddress, encryptedContent, proofData, transactionSignature, messageHash, timestamp }: MessageRequest = await req.json()
 
     console.log('Received message from wallet:', walletAddress)
-    console.log('Proof data:', proofData)
-    console.log('Signature:', signature)
+    console.log('Transaction signature:', transactionSignature)
+    console.log('Message hash:', messageHash)
 
-    // Verify signature to authenticate wallet ownership
-    const authMessage = `SNARK:${walletAddress}:${timestamp}`
-    const messageBytes = new TextEncoder().encode(authMessage)
+    // Verify the transaction exists on Solana blockchain (authentication via on-chain tx)
+    console.log('Verifying transaction on Solana...')
+    const SOLANA_RPC = 'https://api.mainnet-beta.solana.com'
     
-    // Convert hex signature to Uint8Array
-    const signatureBytes = new Uint8Array(
-      signature.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
-    )
-    
-    // Convert base58 public key to bytes
-    const publicKeyBytes = decodeBase58(walletAddress)
-    
-    const isValidSignature = nacl.sign.detached.verify(
-      messageBytes,
-      signatureBytes,
-      publicKeyBytes
-    )
+    const txResponse = await fetch(SOLANA_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getTransaction',
+        params: [
+          transactionSignature,
+          { encoding: 'json', maxSupportedTransactionVersion: 0 }
+        ],
+      }),
+    })
 
-    console.log('Signature verification:', isValidSignature ? 'VALID' : 'INVALID')
-
-    if (!isValidSignature) {
+    const txData = await txResponse.json()
+    
+    if (txData.error || !txData.result) {
+      console.error('Transaction verification failed:', txData.error)
       return new Response(
-        JSON.stringify({ error: 'Invalid wallet signature - authentication failed' }),
+        JSON.stringify({ 
+          error: 'Transaction not found on blockchain',
+          details: txData.error?.message || 'Transaction may still be processing'
+        }),
         { 
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -66,11 +70,56 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Verify the transaction was signed by the claimed wallet
+    const txAccountKeys = txData.result.transaction.message.accountKeys
+    const signerPublicKey = txAccountKeys[0] // First account is always the signer
+    
+    if (signerPublicKey !== walletAddress) {
+      console.error('Wallet mismatch:', signerPublicKey, 'vs claimed:', walletAddress)
+      return new Response(
+        JSON.stringify({ error: 'Transaction not signed by claimed wallet' }),
+        { 
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Verify the memo contains the message hash
+    const memoInstruction = txData.result.transaction.message.instructions.find(
+      (ix: any) => ix.programId === 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'
+    )
+    
+    if (memoInstruction?.data) {
+      // Decode base64 to UTF-8 using Web APIs (Deno compatible)
+      const base64Data = memoInstruction.data
+      const binaryString = atob(base64Data)
+      const bytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
+      }
+      const memoText = new TextDecoder().decode(bytes)
+      console.log('Memo from transaction:', memoText)
+      
+      if (!memoText.includes(messageHash)) {
+        console.error('Message hash mismatch in memo')
+        return new Response(
+          JSON.stringify({ error: 'Transaction memo does not match message hash' }),
+          { 
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
+    }
+
+    console.log('✅ Transaction verified on-chain - wallet authenticated')
+
     // Check timestamp to prevent replay attacks (within 5 minutes)
     const now = Date.now()
     if (Math.abs(now - timestamp) > 5 * 60 * 1000) {
       return new Response(
-        JSON.stringify({ error: 'Signature expired - please try again' }),
+        JSON.stringify({ error: 'Timestamp expired - please try again' }),
         { 
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -201,14 +250,15 @@ Deno.serve(async (req) => {
       console.warn('⚠️ No external verifier configured, using structural validation only')
     }
 
-    // Insert message into database
+    // Insert message into database with blockchain transaction hash
     const { data: messageData, error } = await supabase
       .from('messages')
       .insert({
         wallet_address: walletAddress,
         encrypted_content: encryptedContent,
         proof_data: proofData,
-        verified: isValidProof && isValidSignature,
+        verified: isValidProof,
+        blockchain_tx_hash: transactionSignature, // Already have the tx hash!
       })
       .select()
       .single()
@@ -247,25 +297,3 @@ Deno.serve(async (req) => {
     )
   }
 })
-
-// Helper function to decode base58 (Solana public key format)
-function decodeBase58(str: string): Uint8Array {
-  const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
-  const ALPHABET_MAP = new Map(ALPHABET.split('').map((c, i) => [c, BigInt(i)]))
-  
-  let result = BigInt(0)
-  for (const char of str) {
-    const value = ALPHABET_MAP.get(char)
-    if (value === undefined) throw new Error('Invalid base58 character')
-    result = result * BigInt(58) + value
-  }
-  
-  // Convert BigInt to Uint8Array (32 bytes for Solana public key)
-  const bytes = new Uint8Array(32)
-  for (let i = 31; i >= 0; i--) {
-    bytes[i] = Number(result & BigInt(0xff))
-    result = result >> BigInt(8)
-  }
-  
-  return bytes
-}

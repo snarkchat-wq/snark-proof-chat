@@ -128,30 +128,47 @@ export const useRealtimeMessages = () => {
       console.log('Encrypting message...');
       const encryptedContent = await encryptMessage(plainTextMessage);
       
-      // 2. Create signature for authentication
-      console.log('Creating signature...');
-      toast({
-        title: 'Step 1/2: Sign to authenticate',
-        description: "Phantom will show a 'Sign Message' prompt.",
-      });
+      // 2. Create blockchain transaction FIRST (for authentication + logging)
+      const messageHash = generateMessageHash(plainTextMessage);
       const timestamp = Date.now();
-      const authMessage = `SNARK:${walletAddress}:${timestamp}`;
-      const encodedMessage = new TextEncoder().encode(authMessage);
-      const signatureObj = await (wallet as any).signMessage(encodedMessage, 'utf8');
+      const memoText = `SNARK:${messageHash}:${timestamp}:${walletAddress.substring(0, 8)}`;
 
-      // Convert signature to hex string
-      const signature = Array.from(signatureObj.signature)
-        .map((b: number) => b.toString(16).padStart(2, '0'))
-        .join('');
+      toast({
+        title: 'Approve blockchain transaction',
+        description: 'Sign once to authenticate and log to Solana',
+      });
+      console.log('📝 Creating Solana transaction...', { memoText });
       
-      // 3. Send to backend for verification and storage
-      console.log('Sending to backend...');
+      // Check SOL balance before attempting transaction
+      const { Connection } = await import('@solana/web3.js');
+      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+      const balance = await connection.getBalance(wallet.publicKey);
+      const solBalance = balance / 1e9;
+      
+      console.log(`💰 Wallet SOL balance: ${solBalance.toFixed(4)} SOL`);
+      
+      if (solBalance < 0.00001) {
+        throw new Error(`Insufficient SOL for gas fees. Balance: ${solBalance.toFixed(6)} SOL. Please add at least 0.001 SOL to your wallet.`);
+      }
+      
+      console.log('🔨 Creating transaction...');
+      const { transaction } = await createMemoTransaction(wallet, memoText);
+      
+      console.log('✍️ Requesting signature from wallet...');
+      const txSignature = await signAndSendTransaction(wallet, transaction);
+      console.log('🎉 Transaction confirmed on Solana:', txSignature);
+      console.log('🔗 View at:', `https://explorer.solana.com/tx/${txSignature}`);
+
+      // 3. Send encrypted message + transaction signature to backend
+      // Backend will verify the transaction on-chain as authentication
+      console.log('📤 Sending message to backend with transaction proof...');
       const response = await supabase.functions.invoke('send-message', {
         body: {
           walletAddress,
           encryptedContent,
           proofData,
-          signature,
+          transactionSignature: txSignature,
+          messageHash,
           timestamp,
         },
       });
@@ -160,111 +177,27 @@ export const useRealtimeMessages = () => {
         throw response.error;
       }
 
-      // 4. Log to Solana blockchain
-      const raw = response.data as any;
-      const messageId: string | undefined = raw?.message?.id;
-
-      // Build memo text regardless, so we can still attempt TX even if ID missing
-      const messageHash = generateMessageHash(plainTextMessage);
-      const memoText = `SNARK:${messageHash}:${messageId ?? 'noid'}:${Date.now()}`;
-
-      toast({
-        title: 'Step 2/2: Approve blockchain transaction',
-        description: 'Phantom will now open a mainnet transaction for approval.',
-      });
-      console.log('📝 Creating Solana transaction...', { messageId, memoText });
+      const messageData = response.data?.message;
       
-      try {
-          // Check SOL balance before attempting transaction
-          const { Connection } = await import('@solana/web3.js');
-          const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-          const balance = await connection.getBalance(wallet.publicKey);
-          const solBalance = balance / 1e9; // Convert lamports to SOL
-          
-          console.log(`💰 Wallet SOL balance: ${solBalance.toFixed(4)} SOL`);
-          
-          if (solBalance < 0.00001) {
-            throw new Error(`Insufficient SOL for gas fees. Balance: ${solBalance.toFixed(6)} SOL. Please add at least 0.001 SOL to your wallet.`);
+      // Optimistically update local state with transaction hash
+      if (messageData?.id) {
+        setMessages((current) => {
+          const exists = current.some((m) => m.id === messageData.id);
+          if (exists) {
+            return current.map((m) =>
+              m.id === messageData.id ? { ...m, blockchain_tx_hash: txSignature } : m
+            );
+          } else {
+            pendingTxRef.current[messageData.id] = txSignature;
+            return current;
           }
-          
-          console.log('🔨 Creating transaction...');
-          const { transaction } = await createMemoTransaction(wallet, memoText);
-          
-          console.log('✍️ Requesting signature from wallet...');
-          const txSignature = await signAndSendTransaction(wallet, transaction);
-          console.log('🎉 Transaction confirmed:', txSignature);
-
-          // Optimistically update local state immediately
-          setMessages((current) => {
-            const exists = messageId ? current.some((m) => m.id === messageId) : false;
-            if (exists && messageId) {
-              return current.map((m) =>
-                m.id === messageId ? { ...m, blockchain_tx_hash: txSignature } : m
-              );
-            } else {
-              // Store pending tx to merge when the INSERT arrives (only if we have an id)
-              if (messageId) pendingTxRef.current[messageId] = txSignature;
-              return current;
-            }
-          });
-          
-          console.log('✅ Transaction confirmed on Solana:', txSignature);
-          console.log('🔗 View transaction:', `https://explorer.solana.com/tx/${txSignature}`);
-          
-          // Wait 2 seconds for transaction to fully propagate on Solana before verifying
-          console.log('⏳ Waiting for transaction to propagate on Solana network...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          console.log('⛓️ Logging transaction to backend for verification...');
-          try {
-            const logResponse = await supabase.functions.invoke('log-to-solana', {
-              body: {
-                messageId,
-                messageHash,
-                transactionSignature: txSignature,
-              },
-            });
-            
-            console.log('📡 Backend response:', logResponse);
-            
-            if (logResponse.error) {
-              console.error('❌ Backend returned error:', logResponse.error);
-              // Don't throw - transaction already succeeded
-              toast({
-                title: 'Backend verification failed',
-                description: 'Transaction succeeded but backend logging failed',
-                variant: 'destructive',
-              });
-            } else {
-              console.log('✅ Backend verification complete:', logResponse.data);
-              toast({
-                title: 'Blockchain verified ✓',
-                description: 'Message logged to Solana mainnet',
-              });
-            }
-          } catch (backendError) {
-            console.error('❌ Backend logging failed:', backendError);
-            // Don't throw - transaction already succeeded
-            toast({
-              title: 'Backend verification failed',
-              description: 'Transaction succeeded but backend logging failed',
-              variant: 'destructive',
-            });
-          }
-        } catch (solanaError) {
-          console.error('❌ Solana transaction failed:', solanaError);
-          const errorMsg = solanaError instanceof Error ? solanaError.message : String(solanaError);
-          
-          // Notify user of blockchain logging failure
-          toast({
-            title: 'Blockchain logging failed',
-            description: errorMsg.includes('rejected') ? 'Transaction was rejected in wallet.' : errorMsg,
-            variant: 'destructive',
-          });
-          
-          // Don't throw the error - message was already saved successfully
-          console.warn('⚠️ Message saved to database but blockchain logging failed');
-        }
+        });
+      }
+      
+      toast({
+        title: 'Message Sent ✅',
+        description: 'Verified and logged to Solana blockchain',
+      });
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;
