@@ -88,6 +88,11 @@ const Index = () => {
                       [ENTER CHAT]
                     </Button>
                   </Link>
+                  <Link to="/use-cases" className="flex-1">
+                    <Button variant="terminal" size="lg" className="w-full">
+                      [USE CASES]
+                    </Button>
+                  </Link>
                   <Link to="/about" className="flex-1">
                     <Button variant="outline" size="lg" className="w-full border-primary text-primary">
                       [HOW IT WORKS]

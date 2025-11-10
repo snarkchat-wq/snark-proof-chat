@@ -10,6 +10,7 @@ import Chat from "./pages/Chat";
 import About from "./pages/About";
 import Admin from "./pages/Admin";
 import OnChain from "./pages/OnChain";
+import UseCases from "./pages/UseCases";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/chat" element={<Chat />} />
+            <Route path="/use-cases" element={<UseCases />} />
             <Route path="/about" element={<About />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/on-chain" element={<OnChain />} />
