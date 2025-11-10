@@ -256,19 +256,6 @@ const Chat = () => {
                           Commitment: {String(msg.proof_data.publicInputs.commitment).slice(0, 18)}...
                         </div>
                       )}
-                      {msg.blockchain_tx_hash && (
-                        <div className="text-accent">
-                          ⛓️ Blockchain: 
-                          <a 
-                            href={`https://explorer.solana.com/tx/${msg.blockchain_tx_hash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:underline ml-1"
-                          >
-                            {msg.blockchain_tx_hash.substring(0, 16)}...
-                          </a>
-                        </div>
-                      )}
                       <Button
                         variant="ghost"
                         size="sm"

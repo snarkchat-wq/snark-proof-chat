@@ -129,25 +129,6 @@ const ProofDetails = ({
         </div>
       </div>
 
-      {/* Blockchain Transaction */}
-      <div className="space-y-1">
-        <span className="text-muted-foreground">Blockchain TX:</span>
-        <div className="bg-card p-2">
-          {blockchainTxHash ? (
-            <a 
-              href={`https://explorer.solana.com/tx/${blockchainTxHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent hover:underline break-all"
-            >
-              {blockchainTxHash}
-            </a>
-          ) : (
-            <span className="text-muted-foreground">Not logged yet</span>
-          )}
-        </div>
-      </div>
-
       {/* Technical Info */}
       <div className="border-t border-accent/30 pt-2 space-y-1">
         <div className="text-muted-foreground text-[10px]">
@@ -166,7 +147,6 @@ const ProofDetails = ({
           <li>✓ Message was authorized by wallet holder</li>
           <li>✓ Proof generated without revealing private key</li>
           <li>✓ Cryptographic verification completed successfully</li>
-          {blockchainTxHash && <li>✓ Transaction logged on Solana blockchain</li>}
         </ul>
       </div>
     </div>
