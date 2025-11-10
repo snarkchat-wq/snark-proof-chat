@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import TerminalHeader from "@/components/TerminalHeader";
 import { useWallet } from "@/contexts/WalletContext";
 import { isAdmin } from "@/lib/tokenGating";
-import { Github } from "lucide-react";
+import { Github, Shield, Users, Lock, Key } from "lucide-react";
 
 const Index = () => {
   const { connected, publicKey } = useWallet();
@@ -88,11 +89,6 @@ const Index = () => {
                       [ENTER CHAT]
                     </Button>
                   </Link>
-                  <Link to="/use-cases" className="flex-1">
-                    <Button variant="terminal" size="lg" className="w-full">
-                      [USE CASES]
-                    </Button>
-                  </Link>
                   <Link to="/about" className="flex-1">
                     <Button variant="outline" size="lg" className="w-full border-primary text-primary">
                       [HOW IT WORKS]
@@ -113,6 +109,71 @@ const Index = () => {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Use Cases */}
+          <div className="border-2 border-primary p-8 bg-card/50">
+            <h3 className="text-2xl text-primary terminal-glow mb-6 font-bold text-center">
+              USE CASES
+            </h3>
+            
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card className="p-6 bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-primary/20 hover:border-primary/40 transition-all duration-300 hover:scale-105 animate-fade-in">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                      <Users className="w-6 h-6 text-primary" />
+                    </div>
+                    <h4 className="text-xl font-bold text-foreground">Whale Chats</h4>
+                  </div>
+                  <p className="text-muted-foreground leading-relaxed text-sm">
+                    Form exclusive whale chats by simply verifying the amount of tokens users hold. Create high-value communities where membership is automatically validated through zero-knowledge proofs without revealing exact balances.
+                  </p>
+                </div>
+              </Card>
+
+              <Card className="p-6 bg-gradient-to-br from-purple-500/20 to-pink-500/20 border-primary/20 hover:border-primary/40 transition-all duration-300 hover:scale-105 animate-fade-in" style={{animationDelay: '0.1s'}}>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                      <Shield className="w-6 h-6 text-primary" />
+                    </div>
+                    <h4 className="text-xl font-bold text-foreground">Military-Grade Encryption</h4>
+                  </div>
+                  <p className="text-muted-foreground leading-relaxed text-sm">
+                    Experience military-grade encryption for private chats. All messages are end-to-end encrypted using advanced cryptographic protocols, ensuring your conversations remain completely private and secure.
+                  </p>
+                </div>
+              </Card>
+
+              <Card className="p-6 bg-gradient-to-br from-pink-500/20 to-orange-500/20 border-primary/20 hover:border-primary/40 transition-all duration-300 hover:scale-105 animate-fade-in" style={{animationDelay: '0.2s'}}>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                      <Key className="w-6 h-6 text-primary" />
+                    </div>
+                    <h4 className="text-xl font-bold text-foreground">Token-Holder Communities</h4>
+                  </div>
+                  <p className="text-muted-foreground leading-relaxed text-sm">
+                    Form communities where users who hold a specific native token can come together and communicate while verifying their token status with zero-knowledge proofs. Build trust without compromising privacy.
+                  </p>
+                </div>
+              </Card>
+
+              <Card className="p-6 bg-gradient-to-br from-orange-500/20 to-blue-500/20 border-primary/20 hover:border-primary/40 transition-all duration-300 hover:scale-105 animate-fade-in" style={{animationDelay: '0.3s'}}>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                      <Lock className="w-6 h-6 text-primary" />
+                    </div>
+                    <h4 className="text-xl font-bold text-foreground">Token-Gated Access</h4>
+                  </div>
+                  <p className="text-muted-foreground leading-relaxed text-sm">
+                    Implement token gating for chats and information. Control access to exclusive content and conversations based on token holdings, automatically verified through blockchain technology.
+                  </p>
+                </div>
+              </Card>
+            </div>
           </div>
 
           {/* Features */}
