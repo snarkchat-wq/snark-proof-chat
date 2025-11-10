@@ -2,14 +2,12 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import TerminalHeader from "@/components/TerminalHeader";
-import { usePhantomWallet } from "@/hooks/usePhantomWallet";
-import { useToast } from "@/hooks/use-toast";
+import { useWallet } from "@/contexts/WalletContext";
 import { isAdmin } from "@/lib/tokenGating";
 import { Github } from "lucide-react";
 
 const Index = () => {
-  const { connected, publicKey, connect, isInstalled } = usePhantomWallet();
-  const { toast } = useToast();
+  const { connected, publicKey } = useWallet();
   const [isUserAdmin, setIsUserAdmin] = useState(false);
 
   useEffect(() => {
@@ -29,33 +27,6 @@ const Index = () => {
     }
   };
 
-  const connectWallet = async () => {
-    try {
-      if (!isInstalled) {
-        toast({
-          title: "Phantom Not Installed",
-          description: "Please install Phantom wallet extension to continue",
-          variant: "destructive",
-        });
-        window.open('https://phantom.app/', '_blank');
-        return;
-      }
-
-      await connect();
-      await checkAdminStatus();
-      toast({
-        title: "Wallet Connected",
-        description: "Successfully connected to Phantom wallet",
-      });
-    } catch (error) {
-      console.error('Failed to connect wallet:', error);
-      toast({
-        title: "Connection Failed",
-        description: "Failed to connect to Phantom wallet",
-        variant: "destructive",
-      });
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background scanlines">
@@ -97,21 +68,8 @@ const Index = () => {
             {!connected ? (
               <div className="space-y-4">
                 <p className="text-foreground font-mono text-sm">
-                  <span className="text-accent">&gt;</span> Connect your Phantom Wallet to access the chat
+                  <span className="text-accent">&gt;</span> Connect your Phantom Wallet using the button in the top right to access the chat
                 </p>
-                {!isInstalled && (
-                  <p className="text-destructive font-mono text-xs">
-                    <span className="text-accent">&gt;</span> Phantom wallet not detected. Click to install.
-                  </p>
-                )}
-                <Button 
-                  variant="terminal-cyan" 
-                  size="lg"
-                  onClick={connectWallet}
-                  className="w-full md:w-auto"
-                >
-                  [CONNECT PHANTOM WALLET]
-                </Button>
               </div>
             ) : (
               <div className="space-y-6">

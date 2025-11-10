@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import TerminalHeader from "@/components/TerminalHeader";
 import ProofAnimation from "@/components/ProofAnimation";
 import ProofDetails from "@/components/ProofDetails";
-import { usePhantomWallet } from "@/hooks/usePhantomWallet";
+import { useWallet } from "@/contexts/WalletContext";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { useToast } from "@/hooks/use-toast";
 import { checkTokenGating, isAdmin } from "@/lib/tokenGating";
@@ -21,7 +21,7 @@ const Chat = () => {
   const [isUserAdmin, setIsUserAdmin] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  const { wallet, connected, publicKey } = usePhantomWallet();
+  const { wallet, connected, publicKey } = useWallet();
   const { messages, loading, sendMessage } = useRealtimeMessages();
   const { toast } = useToast();
 

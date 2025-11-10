@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { usePhantomWallet } from '@/hooks/usePhantomWallet';
+import { useWallet } from '@/contexts/WalletContext';
 import { isAdmin, getTokenRequirements, TokenRequirement } from '@/lib/tokenGating';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import TerminalHeader from '@/components/TerminalHeader';
 import { NavLink } from '@/components/NavLink';
 
 const Admin = () => {
-  const { publicKey } = usePhantomWallet();
+  const { publicKey } = useWallet();
   const { toast } = useToast();
   const navigate = useNavigate();
   

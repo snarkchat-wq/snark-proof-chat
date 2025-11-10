@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import TerminalHeader from "@/components/TerminalHeader";
-import { usePhantomWallet } from "@/hooks/usePhantomWallet";
+import { useWallet } from "@/contexts/WalletContext";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 const OnChain = () => {
-  const { connected, publicKey } = usePhantomWallet();
+  const { connected, publicKey } = useWallet();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<{
