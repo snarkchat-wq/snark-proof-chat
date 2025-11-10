@@ -2,6 +2,9 @@
 
 A privacy-preserving encrypted messaging platform that uses Zero-Knowledge Proofs (ZK-SNARKs) to verify token ownership without revealing exact balances. Built on Solana with cryptographic verification.
 
+<img width="1500" height="500" alt="Copy of Untitled (8)" src="https://github.com/user-attachments/assets/e636b981-1e4c-452c-a672-36d657d460c8" />
+
+
 ## 🌟 Overview
 
 This application enables users to send encrypted messages to a chat while proving they meet token-holding requirements—all without exposing their actual token balance. Every message is cryptographically verified and optionally logged to the Solana blockchain for immutable proof.
