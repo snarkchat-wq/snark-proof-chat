@@ -222,29 +222,28 @@ export const useRealtimeMessages = () => {
                 transactionSignature: txSignature,
               },
             });
-            if (logResponse.error) throw logResponse.error;
-            logOk = true;
-            console.log('✅ Backend verification complete (invoke):', logResponse.data);
-          } catch (e1) {
-            console.warn('⚠️ invoke failed, trying direct fetch fallback...', e1);
-            try {
-              const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/log-to-solana`;
-              const res = await fetch(url, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-                  'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                },
-                body: JSON.stringify({ messageId, messageHash, transactionSignature: txSignature }),
-              });
-              const data = await res.json().catch(() => ({}));
-              if (!res.ok) throw new Error(JSON.stringify(data));
-              logOk = true;
-              console.log('✅ Backend verification complete (fetch):', data);
-            } catch (e2) {
-              console.error('❌ Backend logging failed (both methods):', e2);
+            
+            console.log('📡 Backend response:', logResponse);
+            
+            if (logResponse.error) {
+              console.error('❌ Backend returned error:', logResponse.error);
+              throw logResponse.error;
             }
+            
+            logOk = true;
+            console.log('✅ Backend verification complete:', logResponse.data);
+            
+            toast({
+              title: 'Blockchain verified ✓',
+              description: 'Message logged to Solana mainnet',
+            });
+          } catch (e1) {
+            console.error('❌ Backend logging failed:', e1);
+            toast({
+              title: 'Blockchain logging failed',
+              description: 'Transaction succeeded but backend verification failed. Check console for details.',
+              variant: 'destructive',
+            });
           }
         } catch (solanaError) {
           console.error('❌ Solana logging failed (message still saved):', solanaError);
