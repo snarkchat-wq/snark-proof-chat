@@ -48,20 +48,7 @@ export async function signAndSendTransaction(
   }
 
   try {
-    // Prefer legacy signTransaction for broad Phantom compatibility with non-versioned Transaction
-    if (typeof (wallet as any).signTransaction === 'function') {
-      const signed = await (wallet as any).signTransaction(transaction);
-      const signature = await connection.sendRawTransaction(signed.serialize(), {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-      });
-      console.log('Transaction sent:', signature);
-      await connection.confirmTransaction(signature, 'confirmed');
-      console.log('Transaction confirmed:', signature);
-      return signature;
-    }
-
-    // Fallback: native signAndSendTransaction (expects VersionedTransaction in some wallets)
+    // Prefer native signAndSendTransaction for Phantom (single prompt)
     if (typeof (wallet as any).signAndSendTransaction === 'function') {
       const res = await (wallet as any).signAndSendTransaction(transaction, {
         skipPreflight: false,
@@ -73,6 +60,19 @@ export async function signAndSendTransaction(
       await connection.confirmTransaction(sig, 'confirmed');
       console.log('Transaction confirmed:', sig);
       return sig;
+    }
+
+    // Fallback: legacy signTransaction + sendRawTransaction
+    if (typeof (wallet as any).signTransaction === 'function') {
+      const signed = await (wallet as any).signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signed.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+      });
+      console.log('Transaction sent:', signature);
+      await connection.confirmTransaction(signature, 'confirmed');
+      console.log('Transaction confirmed:', signature);
+      return signature;
     }
 
     throw new Error('Wallet does not support transaction signing');
