@@ -16,8 +16,11 @@ export async function createMemoTransaction(
   }
 
   try {
-    // Get latest blockhash
-    const { blockhash } = await connection.getLatestBlockhash('finalized');
+    console.log('🔨 Creating Solana memo transaction...');
+    
+    // Get latest blockhash with maximum freshness
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
+    console.log('📦 Got fresh blockhash:', blockhash.substring(0, 8) + '...');
 
     // Create memo instruction
     const memoInstruction = new TransactionInstruction({
@@ -26,15 +29,16 @@ export async function createMemoTransaction(
       data: Buffer.from(memo, 'utf8'),
     });
 
-    // Create transaction
+    // Create transaction with proper structure for Phantom
     const transaction = new Transaction({
       recentBlockhash: blockhash,
       feePayer: wallet.publicKey,
     }).add(memoInstruction);
 
+    console.log('✅ Transaction created successfully');
     return { transaction };
   } catch (error) {
-    console.error('Error creating memo transaction:', error);
+    console.error('❌ Error creating memo transaction:', error);
     throw error;
   }
 }
@@ -48,36 +52,44 @@ export async function signAndSendTransaction(
   }
 
   try {
-    // Prefer native signAndSendTransaction for Phantom (single prompt)
-    if (typeof (wallet as any).signAndSendTransaction === 'function') {
-      const res = await (wallet as any).signAndSendTransaction(transaction, {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
-      });
-      const sig: string = typeof res === 'string' ? res : res?.signature;
-      if (!sig) throw new Error('No signature returned by wallet');
-      console.log('Transaction sent:', sig);
-      await connection.confirmTransaction(sig, 'confirmed');
-      console.log('Transaction confirmed:', sig);
-      return sig;
-    }
-
-    // Fallback: legacy signTransaction + sendRawTransaction
+    console.log('🔐 Attempting to sign transaction with Phantom...');
+    
+    // Phantom requires signTransaction (not signAndSendTransaction) for Transaction objects
     if (typeof (wallet as any).signTransaction === 'function') {
+      console.log('📝 Requesting signature from Phantom wallet...');
+      
+      // This will trigger the Phantom popup
       const signed = await (wallet as any).signTransaction(transaction);
+      console.log('✅ Transaction signed by user');
+      
+      console.log('📡 Sending signed transaction to Solana network...');
       const signature = await connection.sendRawTransaction(signed.serialize(), {
         skipPreflight: false,
         preflightCommitment: 'confirmed',
       });
-      console.log('Transaction sent:', signature);
+      console.log('🚀 Transaction sent to network:', signature);
+      
+      console.log('⏳ Waiting for transaction confirmation...');
       await connection.confirmTransaction(signature, 'confirmed');
-      console.log('Transaction confirmed:', signature);
+      console.log('✅ Transaction confirmed on-chain:', signature);
+      
       return signature;
     }
 
     throw new Error('Wallet does not support transaction signing');
   } catch (error) {
-    console.error('Error signing/sending transaction:', error);
+    console.error('❌ Error signing/sending transaction:', error);
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('User rejected')) {
+        throw new Error('Transaction rejected by user in Phantom wallet');
+      }
+      if (error.message.includes('Blockhash not found')) {
+        throw new Error('Transaction expired. Please try again.');
+      }
+    }
+    
     throw error;
   }
 }

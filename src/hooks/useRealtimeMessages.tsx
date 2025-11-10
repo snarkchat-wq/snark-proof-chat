@@ -187,9 +187,12 @@ export const useRealtimeMessages = () => {
             throw new Error(`Insufficient SOL for gas fees. Balance: ${solBalance.toFixed(6)} SOL. Please add at least 0.001 SOL to your wallet.`);
           }
           
+          console.log('🔨 Creating transaction...');
           const { transaction } = await createMemoTransaction(wallet, memoText);
-          console.log('✍️ Signing and sending transaction...');
+          
+          console.log('✍️ Requesting signature from wallet...');
           const txSignature = await signAndSendTransaction(wallet, transaction);
+          console.log('🎉 Transaction confirmed:', txSignature);
 
           // Optimistically update local state immediately
           setMessages((current) => {
@@ -213,7 +216,6 @@ export const useRealtimeMessages = () => {
           await new Promise(resolve => setTimeout(resolve, 2000));
           
           console.log('⛓️ Logging transaction to backend for verification...');
-          let logOk = false;
           try {
             const logResponse = await supabase.functions.invoke('log-to-solana', {
               body: {
@@ -227,36 +229,41 @@ export const useRealtimeMessages = () => {
             
             if (logResponse.error) {
               console.error('❌ Backend returned error:', logResponse.error);
-              throw logResponse.error;
+              // Don't throw - transaction already succeeded
+              toast({
+                title: 'Backend verification failed',
+                description: 'Transaction succeeded but backend logging failed',
+                variant: 'destructive',
+              });
+            } else {
+              console.log('✅ Backend verification complete:', logResponse.data);
+              toast({
+                title: 'Blockchain verified ✓',
+                description: 'Message logged to Solana mainnet',
+              });
             }
-            
-            logOk = true;
-            console.log('✅ Backend verification complete:', logResponse.data);
-            
+          } catch (backendError) {
+            console.error('❌ Backend logging failed:', backendError);
+            // Don't throw - transaction already succeeded
             toast({
-              title: 'Blockchain verified ✓',
-              description: 'Message logged to Solana mainnet',
-            });
-          } catch (e1) {
-            console.error('❌ Backend logging failed:', e1);
-            toast({
-              title: 'Blockchain logging failed',
-              description: 'Transaction succeeded but backend verification failed. Check console for details.',
+              title: 'Backend verification failed',
+              description: 'Transaction succeeded but backend logging failed',
               variant: 'destructive',
             });
           }
         } catch (solanaError) {
-          console.error('❌ Solana logging failed (message still saved):', solanaError);
+          console.error('❌ Solana transaction failed:', solanaError);
           const errorMsg = solanaError instanceof Error ? solanaError.message : String(solanaError);
+          
           // Notify user of blockchain logging failure
           toast({
             title: 'Blockchain logging failed',
-            description: errorMsg.includes('User rejected') ? 'Transaction was rejected in wallet.' : errorMsg,
+            description: errorMsg.includes('rejected') ? 'Transaction was rejected in wallet.' : errorMsg,
             variant: 'destructive',
           });
-          if (errorMsg.includes('Insufficient SOL')) {
-            throw new Error('Message saved but blockchain logging failed: ' + errorMsg);
-          }
+          
+          // Don't throw the error - message was already saved successfully
+          console.warn('⚠️ Message saved to database but blockchain logging failed');
         }
     } catch (error) {
       console.error('Error sending message:', error);
