@@ -175,18 +175,6 @@ export const useRealtimeMessages = () => {
       console.log('📝 Creating Solana transaction...', { messageId, memoText });
       
       try {
-          // Check SOL balance before attempting transaction
-          const { Connection } = await import('@solana/web3.js');
-          const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-          const balance = await connection.getBalance(wallet.publicKey);
-          const solBalance = balance / 1e9; // Convert lamports to SOL
-          
-          console.log(`💰 Wallet SOL balance: ${solBalance.toFixed(4)} SOL`);
-          
-          if (solBalance < 0.00001) {
-            throw new Error(`Insufficient SOL for gas fees. Balance: ${solBalance.toFixed(6)} SOL. Please add at least 0.001 SOL to your wallet.`);
-          }
-          
           console.log('🔨 Creating transaction...');
           const { transaction } = await createMemoTransaction(wallet, memoText);
           
