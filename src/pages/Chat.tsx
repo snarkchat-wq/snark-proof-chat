@@ -8,22 +8,28 @@ import ProofDetails from "@/components/ProofDetails";
 import { useWallet } from "@/contexts/WalletContext";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { useToast } from "@/hooks/use-toast";
-import { checkTokenGating, isAdmin } from "@/lib/tokenGating";
+import { useTokenBalance } from "@/hooks/useTokenBalance";
+import { isAdmin } from "@/lib/tokenGating";
 
 const Chat = () => {
   const [message, setMessage] = useState("");
   const [showProofAnimation, setShowProofAnimation] = useState(false);
   const [selectedProof, setSelectedProof] = useState<string | null>(null);
   const [showBlockchainAnimation, setShowBlockchainAnimation] = useState(false);
-  const [tokenBalance, setTokenBalance] = useState<number | null>(null);
-  const [tokenRequired, setTokenRequired] = useState<number | null>(null);
-  const [hasAccess, setHasAccess] = useState(false);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const { wallet, connected, publicKey } = useWallet();
   const { messages, loading, sendMessage } = useRealtimeMessages();
   const { toast } = useToast();
+  
+  // Real-time token balance monitoring
+  const { 
+    balance: tokenBalance, 
+    required: tokenRequired, 
+    hasAccess, 
+    loading: balanceLoading 
+  } = useTokenBalance(publicKey);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages arrive
@@ -32,48 +38,22 @@ const Chat = () => {
 
   useEffect(() => {
     if (connected && publicKey) {
-      checkTokenAccess();
       checkAdminStatus();
     }
   }, [connected, publicKey]);
 
-  const checkTokenAccess = async () => {
-    if (!publicKey) {
-      console.error('❌ No publicKey available for token check');
-      return;
-    }
-    
-    // Verify we have the FULL wallet address, not truncated
-    console.log('🔑 Full wallet address being checked:', publicKey);
-    console.log('📏 Wallet address length:', publicKey.length);
-    console.log('✅ Is valid Solana address length?', publicKey.length >= 32 && publicKey.length <= 44);
-    
-    try {
-      const result = await checkTokenGating(publicKey);
-      console.log('📋 Token gating result:', result);
-      
-      setTokenBalance(result.balance);
-      setTokenRequired(result.required);
-      setHasAccess(result.allowed);
-      
-      if (!result.allowed) {
+  // Show toast when token balance changes
+  useEffect(() => {
+    if (!balanceLoading && tokenBalance !== null && tokenRequired !== null) {
+      if (!hasAccess) {
         toast({
           title: "Insufficient Token Balance",
-          description: `You need ${result.required.toLocaleString()} tokens to send messages. Current balance: ${result.balance.toLocaleString()}`,
+          description: `You need ${tokenRequired.toLocaleString()} tokens to send messages. Current balance: ${tokenBalance.toLocaleString()}`,
           variant: "destructive",
         });
-      } else {
-        console.log(`✅ Token access granted: ${result.balance}/${result.required}`);
       }
-    } catch (error) {
-      console.error('❌ Error checking token access:', error);
-      toast({
-        title: "Token Check Failed",
-        description: error instanceof Error ? error.message : "Unable to verify token balance",
-        variant: "destructive",
-      });
     }
-  };
+  }, [hasAccess, tokenBalance, tokenRequired, balanceLoading]);
 
   const checkAdminStatus = async () => {
     if (!publicKey) return;
@@ -98,8 +78,6 @@ const Chat = () => {
     }
 
     if (!hasAccess) {
-      // Attempt a fresh check to populate values if missing
-      try { await checkTokenAccess(); } catch {}
       const requiredText = tokenRequired != null ? tokenRequired.toLocaleString() : 'the required';
       const balanceText = tokenBalance != null ? tokenBalance.toLocaleString() : '0';
       toast({
