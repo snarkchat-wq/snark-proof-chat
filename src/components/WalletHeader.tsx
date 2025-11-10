@@ -52,17 +52,17 @@ const WalletHeader = () => {
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+    <div className="fixed top-4 right-4 z-50 flex items-center gap-3">
       {connected && publicKey ? (
         <>
-          <div className="bg-card/80 backdrop-blur-sm border border-primary px-3 py-2 rounded font-mono text-xs text-primary">
+          <div className="bg-card/80 backdrop-blur-sm border border-primary px-4 py-3 rounded font-mono text-base text-primary">
             {formatAddress(publicKey)}
           </div>
           <Button
             variant="outline"
-            size="sm"
+            size="lg"
             onClick={handleDisconnect}
-            className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground text-base px-6"
           >
             Disconnect
           </Button>
@@ -70,8 +70,9 @@ const WalletHeader = () => {
       ) : (
         <Button
           variant="terminal"
-          size="sm"
+          size="lg"
           onClick={handleConnect}
+          className="text-base px-8 py-6"
         >
           Connect Wallet
         </Button>
