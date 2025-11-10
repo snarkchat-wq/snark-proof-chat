@@ -1,4 +1,4 @@
-# ZK-Proof Encrypted Messaging Platform
+# INTRODUCING SNARK CHAT: ZK-Proof Encrypted Messaging Platform
 
 A privacy-preserving encrypted messaging platform that uses Zero-Knowledge Proofs (ZK-SNARKs) to verify token ownership without revealing exact balances. Built on Solana with cryptographic verification.
 
