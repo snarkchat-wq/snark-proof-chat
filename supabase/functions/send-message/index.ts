@@ -12,6 +12,7 @@ interface MessageRequest {
   proofData: {
     proof: string
     publicInputs: any
+    publicSignals?: string[]  // Add optional publicSignals array
   }
   signature: string
   timestamp: number
@@ -149,15 +150,21 @@ Deno.serve(async (req) => {
     // Get Vercel verifier URL from environment
     const verifierUrl = Deno.env.get('VERCEL_ZK_VERIFIER_URL')
     
+    // Use the full publicSignals array from the proof, not just threshold/commitment
+    // The circuit outputs 3 public signals: [threshold, commitment, valid]
+    const publicSignals = proofData.publicSignals || [
+      proofData.publicInputs.threshold,
+      proofData.publicInputs.commitment,
+    ];
+    
+    console.log('Using public signals:', publicSignals);
+    
     const { data: zkResult, error: zkError } = await supabase.functions.invoke(
       'verify-zk-proof',
       {
         body: {
           proof: proofData.proof,
-          publicSignals: [
-            proofData.publicInputs.threshold,
-            proofData.publicInputs.commitment,
-          ],
+          publicSignals: publicSignals,
           vkey: vkey,
           verifierUrl: verifierUrl,
         },

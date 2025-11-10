@@ -132,6 +132,7 @@ const Chat = () => {
       
       const proofData = {
         proof: zkProof.proof,
+        publicSignals: zkProof.publicSignals, // Include the full public signals array
         publicInputs: {
           threshold: String(derivedThreshold),
           commitment: String(derivedCommitment),
